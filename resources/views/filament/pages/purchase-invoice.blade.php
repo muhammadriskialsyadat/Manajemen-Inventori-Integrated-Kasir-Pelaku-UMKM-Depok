@@ -153,7 +153,7 @@
     <div class="invoice-header">
         <div class="company-name">
             <span style="color: #2563eb;">WAROENG</span>
-            <span style="color: #9333ea;">SMART GENDUT</span>
+            <span style="color: #9333ea;">SMART</span>
         </div>
         <div class="company-subtitle">Waroeng Smart Management System</div>
         <div class="invoice-title">PURCHASE ORDER</div>
