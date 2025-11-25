@@ -31,13 +31,12 @@ class AdminPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Blue,
             ])
-            ->brandName('HEAVEN SPOT INDO')
-            ->brandLogo(fn () => new HtmlString('
+            ->brandName('WAROENG SMART')
+            ->brandLogo(fn() => new HtmlString('
                 <div style="text-align: center;">
                     <div style="font-size: 1.2rem; font-weight: 900; line-height: 1.2;">
-                        <span style="color: #2563eb;">HEAVEN</span>
-                        <span style="color: #9333ea; margin: 0 2px;">SPOT</span>
-                        <span style="color: #059669;">INDO</span>
+                        <span style="color: #2563eb;">WAROENG</span>
+                        <span style="color: #9333ea; margin: 0 2px;">SMART</span>
                     </div>
                 </div>
             '))
@@ -49,13 +48,13 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-    Widgets\AccountWidget::class,
-    \App\Filament\Widgets\StatsOverviewWidget::class,
-    \App\Filament\Widgets\LowStockWidget::class,
-    \App\Filament\Widgets\RecentStockMovementsWidget::class,
-    //\App\Filament\Widgets\RecentTransactionsWidget::class,
-     // TAMBAHKAN INI
-])
+                Widgets\AccountWidget::class,
+                \App\Filament\Widgets\StatsOverviewWidget::class,
+                \App\Filament\Widgets\LowStockWidget::class,
+                \App\Filament\Widgets\RecentStockMovementsWidget::class,
+                //\App\Filament\Widgets\RecentTransactionsWidget::class,
+                // TAMBAHKAN INI
+            ])
             ->middleware([
                 EncryptCookies::class,
                 AddQueuedCookiesToResponse::class,

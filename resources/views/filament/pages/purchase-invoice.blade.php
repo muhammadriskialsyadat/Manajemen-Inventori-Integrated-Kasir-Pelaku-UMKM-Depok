@@ -1,6 +1,7 @@
 <!-- resources/views/filament/pages/purchase-invoice.blade.php -->
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="utf-8">
     <title>Purchase Order Invoice - {{ $purchaseOrder->po_number }}</title>
@@ -12,148 +13,149 @@
             font-size: 12px;
             line-height: 1.4;
         }
-        
+
         .invoice-header {
             text-align: center;
             border-bottom: 2px solid #000;
             padding-bottom: 20px;
             margin-bottom: 20px;
         }
-        
+
         .company-name {
             font-size: 24px;
             font-weight: bold;
             margin-bottom: 5px;
         }
-        
+
         .company-subtitle {
             font-size: 14px;
             color: #666;
             margin-bottom: 10px;
         }
-        
+
         .invoice-title {
             font-size: 18px;
             font-weight: bold;
             margin-top: 10px;
         }
-        
+
         .invoice-details {
             display: flex;
             justify-content: space-between;
             margin-bottom: 20px;
         }
-        
-        .invoice-info, .supplier-info {
+
+        .invoice-info,
+        .supplier-info {
             width: 48%;
         }
-        
+
         .info-title {
             font-weight: bold;
             margin-bottom: 10px;
             border-bottom: 1px solid #ddd;
             padding-bottom: 5px;
         }
-        
+
         .info-row {
             margin-bottom: 5px;
         }
-        
+
         .info-label {
             font-weight: bold;
             display: inline-block;
             width: 100px;
         }
-        
+
         .items-table {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 20px;
         }
-        
+
         .items-table th,
         .items-table td {
             border: 1px solid #ddd;
             padding: 8px;
             text-align: left;
         }
-        
+
         .items-table th {
             background-color: #f5f5f5;
             font-weight: bold;
         }
-        
+
         .text-right {
             text-align: right;
         }
-        
+
         .text-center {
             text-align: center;
         }
-        
+
         .total-section {
             float: right;
             width: 300px;
             margin-top: 10px;
         }
-        
+
         .total-row {
             display: flex;
             justify-content: space-between;
             margin-bottom: 5px;
             padding: 5px 0;
         }
-        
+
         .total-row.final {
             border-top: 2px solid #000;
             font-weight: bold;
             font-size: 14px;
         }
-        
+
         .footer {
             clear: both;
             margin-top: 40px;
             padding-top: 20px;
             border-top: 1px solid #ddd;
         }
-        
+
         .signature-section {
             display: flex;
             justify-content: space-between;
             margin-top: 40px;
         }
-        
+
         .signature-box {
             width: 200px;
             text-align: center;
         }
-        
+
         .signature-line {
             border-top: 1px solid #000;
             margin-top: 60px;
             padding-top: 5px;
         }
-        
+
         @media print {
             body {
                 margin: 0;
                 padding: 15px;
             }
-            
+
             .no-print {
                 display: none;
             }
         }
     </style>
 </head>
+
 <body>
     <div class="invoice-header">
         <div class="company-name">
-            <span style="color: #2563eb;">HEAVEN</span>
-            <span style="color: #9333ea;">SPOT</span>
-            <span style="color: #059669;">INDO</span>
+            <span style="color: #2563eb;">WAROENG</span>
+            <span style="color: #9333ea;">SMART</span>
         </div>
-        <div class="company-subtitle">Premium Paint Management System</div>
+        <div class="company-subtitle">Waroeng Smart Management System</div>
         <div class="invoice-title">PURCHASE ORDER</div>
     </div>
 
@@ -177,7 +179,7 @@
                 {{ $purchaseOrder->created_at->format('d/m/Y H:i') }}
             </div>
         </div>
-        
+
         <div class="supplier-info">
             <div class="info-title">SUPPLIER INFO</div>
             <div class="info-row">
@@ -237,30 +239,30 @@
     </table>
 
     <div class="total-section">
-    <div class="total-row">
-        <span>Subtotal:</span>
-        <span>Rp {{ number_format($purchaseOrder->subtotal, 0, ',', '.') }}</span>
+        <div class="total-row">
+            <span>Subtotal:</span>
+            <span>Rp {{ number_format($purchaseOrder->subtotal, 0, ',', '.') }}</span>
+        </div>
+
+        @if($purchaseOrder->discount_percentage > 0)
+        <div class="total-row">
+            <span>Diskon ({{ $purchaseOrder->discount_percentage }}%):</span>
+            <span>- Rp {{ number_format($purchaseOrder->discount_amount, 0, ',', '.') }}</span>
+        </div>
+        @endif
+
+        @if($purchaseOrder->tax_percentage > 0)
+        <div class="total-row">
+            <span>PPN ({{ $purchaseOrder->tax_percentage }}%):</span>
+            <span>Rp {{ number_format($purchaseOrder->tax_amount, 0, ',', '.') }}</span>
+        </div>
+        @endif
+
+        <div class="total-row final">
+            <span>GRAND TOTAL:</span>
+            <span>Rp {{ number_format($purchaseOrder->grand_total, 0, ',', '.') }}</span>
+        </div>
     </div>
-    
-    @if($purchaseOrder->discount_percentage > 0)
-    <div class="total-row">
-        <span>Diskon ({{ $purchaseOrder->discount_percentage }}%):</span>
-        <span>- Rp {{ number_format($purchaseOrder->discount_amount, 0, ',', '.') }}</span>
-    </div>
-    @endif
-    
-    @if($purchaseOrder->tax_percentage > 0)
-    <div class="total-row">
-        <span>PPN ({{ $purchaseOrder->tax_percentage }}%):</span>
-        <span>Rp {{ number_format($purchaseOrder->tax_amount, 0, ',', '.') }}</span>
-    </div>
-    @endif
-    
-    <div class="total-row final">
-        <span>GRAND TOTAL:</span>
-        <span>Rp {{ number_format($purchaseOrder->grand_total, 0, ',', '.') }}</span>
-    </div>
-</div>
 
     @if($purchaseOrder->notes)
     <div class="footer">
@@ -300,4 +302,5 @@
         </button>
     </div>
 </body>
+
 </html>

@@ -51,9 +51,9 @@ class ProductResource extends Resource
                         Forms\Components\TextInput::make('brand')
                             ->label('Brand')
                             ->maxLength(255),
-                        Forms\Components\TextInput::make('color')
-                            ->label('Warna')
-                            ->maxLength(100),
+                        // Forms\Components\TextInput::make('color')
+                        //     ->label('Warna')
+                        //     ->maxLength(100),
                         Forms\Components\TextInput::make('size')
                             ->label('Ukuran')
                             ->placeholder('Contoh: 1L, 2.5L, 5L')
@@ -64,7 +64,7 @@ class ProductResource extends Resource
                             ->required()
                             ->maxLength(20),
                     ])->columns(2),
-                
+
                 Forms\Components\Section::make('Stok & Harga')
                     ->schema([
                         Forms\Components\TextInput::make('minimum_stock')
@@ -90,7 +90,7 @@ class ProductResource extends Resource
                             ->default(0)
                             ->minValue(0),
                     ])->columns(2),
-                
+
                 Forms\Components\Section::make('Deskripsi')
                     ->schema([
                         Forms\Components\Textarea::make('description')
@@ -120,10 +120,10 @@ class ProductResource extends Resource
                     ->label('Brand')
                     ->searchable()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('color')
-                    ->label('Warna')
-                    ->searchable()
-                    ->toggleable(),
+                // Tables\Columns\TextColumn::make('color')
+                //     ->label('Warna')
+                //     ->searchable()
+                //     ->toggleable(),
                 Tables\Columns\TextColumn::make('size')
                     ->label('Ukuran')
                     ->toggleable(),
@@ -131,7 +131,7 @@ class ProductResource extends Resource
                     ->label('Stok')
                     ->sortable()
                     ->badge()
-                    ->color(fn ($state, $record) => match ($record->stock_status) {
+                    ->color(fn($state, $record) => match ($record->stock_status) {
                         'out' => 'danger',
                         'low' => 'warning',
                         'normal' => 'success',
@@ -143,12 +143,12 @@ class ProductResource extends Resource
                 Tables\Columns\TextColumn::make('stock_status')
                     ->label('Status Stok')
                     ->badge()
-                    ->color(fn ($state) => match ($state) {
+                    ->color(fn($state) => match ($state) {
                         'out' => 'danger',
                         'low' => 'warning',
                         'normal' => 'success',
                     })
-                    ->formatStateUsing(fn ($state) => match ($state) {
+                    ->formatStateUsing(fn($state) => match ($state) {
                         'out' => 'Habis',
                         'low' => 'Menipis',
                         'normal' => 'Normal',
@@ -199,7 +199,7 @@ class ProductResource extends Resource
             'index' => Pages\ListProducts::route('/'),
             'create' => Pages\CreateProduct::route('/create'),
             'view' => Pages\ViewProduct::route('/{record}'),
-            
+
             'edit' => Pages\EditProduct::route('/{record}/edit'),
         ];
     }
