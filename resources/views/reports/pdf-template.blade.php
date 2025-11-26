@@ -24,9 +24,17 @@
         .company-name {
             font-size: 20px;
             font-weight: bold;
-            color: #2563eb;
             margin-bottom: 5px;
         }
+
+        .waroeng {
+            color: #2563eb;
+        }
+
+        .smart {
+            color: #8b5cf6;
+        }
+
 
         .report-title {
             font-size: 16px;
@@ -131,7 +139,10 @@
 
 <body>
     <div class="header">
-        <div class="company-name">WAROENG SMART</div>
+        <div class="company-name">
+            <span class="waroeng">WAROENG</span>
+            <span class="smart">SMART</span>
+        </div>
         <div>Waroeng Smart Management System</div>
         <div class="report-title">
             @if($reportType === 'stock')
