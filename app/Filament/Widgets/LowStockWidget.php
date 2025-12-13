@@ -35,18 +35,18 @@ class LowStockWidget extends BaseWidget
                 Tables\Columns\TextColumn::make('current_stock')
                     ->label('Stok Saat Ini')
                     ->badge()
-                    ->color(fn ($record) => $record->current_stock <= 0 ? 'danger' : 'warning'),
+                    ->color(fn($record) => $record->current_stock <= 0 ? 'danger' : 'warning'),
                 Tables\Columns\TextColumn::make('minimum_stock')
                     ->label('Stok Minimum'),
                 Tables\Columns\TextColumn::make('stock_status')
                     ->label('Status')
                     ->badge()
-                    ->color(fn ($state) => match ($state) {
+                    ->color(fn($state) => match ($state) {
                         'out' => 'danger',
                         'low' => 'warning',
                         'normal' => 'success',
                     })
-                    ->formatStateUsing(fn ($state) => match ($state) {
+                    ->formatStateUsing(fn($state) => match ($state) {
                         'out' => 'Habis',
                         'low' => 'Menipis',
                         'normal' => 'Normal',
@@ -56,7 +56,7 @@ class LowStockWidget extends BaseWidget
                 Tables\Actions\Action::make('restock')
                     ->label('Restock')
                     ->icon('heroicon-o-plus')
-                    ->url(fn ($record) => route('filament.admin.resources.products.edit', $record))
+                    ->url(fn($record) => route('filament.admin.resources.purchase-orders.create', $record))
                     ->openUrlInNewTab(),
             ]);
     }

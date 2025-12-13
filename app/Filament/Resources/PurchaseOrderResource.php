@@ -33,7 +33,7 @@ class PurchaseOrderResource extends Resource
                             ->label('No. Purchase Order')
                             ->required()
                             ->unique(ignoreRecord: true)
-                            ->default(fn () => 'PO-' . date('Ymd') . '-' . str_pad(PurchaseOrder::whereDate('created_at', today())->count() + 1, 3, '0', STR_PAD_LEFT))
+                            ->default(fn() => 'PO-' . date('Ymd') . '-' . str_pad(PurchaseOrder::whereDate('created_at', today())->count() + 1, 3, '0', STR_PAD_LEFT))
                             ->maxLength(100),
                         Forms\Components\Select::make('supplier_id')
                             ->label('Supplier')
@@ -71,130 +71,203 @@ class PurchaseOrderResource extends Resource
                             ->label('Catatan')
                             ->rows(3),
                     ])->columns(2),
-                    Forms\Components\Section::make('Pengaturan Pajak & Diskon')
-                ->schema([
-                    Forms\Components\TextInput::make('discount_percentage')
-                        ->label('Diskon (%)')
-                        ->numeric()
-                        ->default(0)
-                        ->minValue(0)
-                        ->maxValue(100)
-                        ->suffix('%')
-                        ->live(onBlur: true)
-                        ->afterStateUpdated(function ($state, $set, $get) {
-                            $subtotal = $get('subtotal') ?? 0;
-                            $discountAmount = $subtotal * ($state / 100);
-                            $set('discount_amount', $discountAmount);
-                            
-                            // Recalculate tax and grand total
-                            $totalAfterDiscount = $subtotal - $discountAmount;
-                            $taxPercentage = $get('tax_percentage') ?? 0;
-                            $taxAmount = $totalAfterDiscount * ($taxPercentage / 100);
-                            $set('tax_amount', $taxAmount);
-                            $set('grand_total', $totalAfterDiscount + $taxAmount);
-                        }),
-                    
-                    Forms\Components\TextInput::make('discount_amount')
-                        ->label('Jumlah Diskon')
-                        ->numeric()
-                        ->prefix('Rp')
-                        ->default(0)
-                        ->disabled()
-                        ->dehydrated(true),
-                    
-                    Forms\Components\Select::make('tax_percentage')
-                        ->label('Pajak')
-                        ->options([
-                            0 => 'Tidak ada pajak (0%)',
-                            10 => 'PPN 10%',
-                            11 => 'PPN 11%',
-                            12 => 'PPN 12%',
-                        ])
-                        ->default(11)
-                        ->live(onBlur: true)
-                        ->afterStateUpdated(function ($state, $set, $get) {
-                            $subtotal = $get('subtotal') ?? 0;
-                            $discountAmount = $get('discount_amount') ?? 0;
-                            $totalAfterDiscount = $subtotal - $discountAmount;
-                            $taxAmount = $totalAfterDiscount * ($state / 100);
-                            $set('tax_amount', $taxAmount);
-                            $set('grand_total', $totalAfterDiscount + $taxAmount);
-                        }),
-                    
-                    Forms\Components\TextInput::make('tax_amount')
-                        ->label('Jumlah Pajak')
-                        ->numeric()
-                        ->prefix('Rp')
-                        ->default(0)
-                        ->disabled()
-                        ->dehydrated(true),
-                ])->columns(2),
-            
-            Forms\Components\Section::make('Total Pembelian')
-                ->schema([
-                    Forms\Components\TextInput::make('subtotal')
-                        ->label('Subtotal')
-                        ->numeric()
-                        ->prefix('Rp')
-                        ->default(0)
-                        ->disabled()
-                        ->dehydrated(true),
-                    
-                    Forms\Components\TextInput::make('grand_total')
-                        ->label('Grand Total')
-                        ->numeric()
-                        ->prefix('Rp')
-                        ->default(0)
-                        ->disabled()
-                        ->dehydrated(true),
-                ])->columns(2),
+
+                Forms\Components\Section::make('Item Pembelian')
+                    ->schema([
+                        Forms\Components\Repeater::make('items')
+                            ->relationship()
+                            ->defaultItems(1)
+                            ->addable(false)
+                            ->deletable(false)
+                            ->schema([
+
+                                Forms\Components\Select::make('product_id')
+                                    ->label('Produk')
+                                    ->relationship('product', 'name')
+                                    ->searchable()
+                                    ->required()
+                                    ->live()
+                                    ->afterStateUpdated(function ($state, $set) {
+                                        if ($state) {
+                                            $product = \App\Models\Product::find($state);
+
+                                            $set('unit_price', $product?->price ?? 0);
+                                            $set('quantity', 1);
+                                            $set('total_price', $product?->price ?? 0);
+                                        }
+                                    }),
+
+                                Forms\Components\TextInput::make('quantity')
+                                    ->label('Total Barang')
+                                    ->numeric()
+                                    ->required()
+                                    ->live()
+                                    ->afterStateUpdated(function ($state, $set, $get) {
+                                        $price = $get('unit_price') ?? 0;
+                                        $set('total_price', $state * $price);
+                                    }),
+
+                                Forms\Components\TextInput::make('unit_price')
+                                    ->label('Harga Satuan')
+                                    ->numeric()
+                                    ->prefix('Rp')
+                                    ->disabled()
+                                    ->dehydrated(true),
+
+                                Forms\Components\TextInput::make('total_price')
+                                    ->label('Subtotal')
+                                    ->numeric()
+                                    ->disabled()
+                                    ->dehydrated(true),
+                            ])
+                            ->columns(4)
+                            ->live()
+                            ->afterStateUpdated(function ($state, $set, $get) {
+                                $subtotal = collect($state)->sum('total_price');
+                                $set('subtotal', $subtotal);
+
+                                $discount = $get('discount_amount') ?? 0;
+                                $taxPercent = $get('tax_percentage') ?? 0;
+
+                                $afterDiscount = $subtotal - $discount;
+                                $tax = $afterDiscount * ($taxPercent / 100);
+
+                                $set('tax_amount', $tax);
+                                $set('grand_total', $afterDiscount + $tax);
+                            }),
+                    ]),
+
+                Forms\Components\Section::make('Pengaturan Pajak & Diskon')
+                    ->schema([
+                        Forms\Components\TextInput::make('discount_percentage')
+                            ->label('Diskon (%)')
+                            ->numeric()
+                            ->default(0)
+                            ->minValue(0)
+                            ->maxValue(100)
+                            ->suffix('%')
+                            ->live(onBlur: true)
+                            ->afterStateUpdated(function ($state, $set, $get) {
+                                $subtotal = $get('subtotal') ?? 0;
+                                $discountAmount = $subtotal * ($state / 100);
+                                $set('discount_amount', $discountAmount);
+
+                                // Recalculate tax and grand total
+                                $totalAfterDiscount = $subtotal - $discountAmount;
+                                $taxPercentage = $get('tax_percentage') ?? 0;
+                                $taxAmount = $totalAfterDiscount * ($taxPercentage / 100);
+                                $set('tax_amount', $taxAmount);
+                                $set('grand_total', $totalAfterDiscount + $taxAmount);
+                            }),
+
+                        Forms\Components\TextInput::make('discount_amount')
+                            ->label('Jumlah Diskon')
+                            ->numeric()
+                            ->prefix('Rp')
+                            ->default(0)
+                            ->disabled()
+                            ->dehydrated(true),
+
+                        Forms\Components\Select::make('tax_percentage')
+                            ->label('Pajak')
+                            ->options([
+                                0 => 'Tidak ada pajak (0%)',
+                                10 => 'PPN 10%',
+                                11 => 'PPN 11%',
+                                12 => 'PPN 12%',
+                            ])
+                            ->default(11)
+                            ->live(onBlur: true)
+                            ->afterStateUpdated(function ($state, $set, $get) {
+                                $subtotal = $get('subtotal') ?? 0;
+                                $discountAmount = $get('discount_amount') ?? 0;
+                                $totalAfterDiscount = $subtotal - $discountAmount;
+                                $taxAmount = $totalAfterDiscount * ($state / 100);
+                                $set('tax_amount', $taxAmount);
+                                $set('grand_total', $totalAfterDiscount + $taxAmount);
+                            }),
+
+                        Forms\Components\TextInput::make('tax_amount')
+                            ->label('Jumlah Pajak')
+                            ->numeric()
+                            ->prefix('Rp')
+                            ->default(0)
+                            ->disabled()
+                            ->dehydrated(true),
+                    ])->columns(2),
+
+                Forms\Components\Section::make('Total Pembelian')
+                    ->schema([
+                        Forms\Components\TextInput::make('subtotal')
+                            ->label('Subtotal')
+                            ->numeric()
+                            ->prefix('Rp')
+                            ->default(0)
+                            ->disabled()
+                            ->dehydrated(true),
+
+                        Forms\Components\TextInput::make('grand_total')
+                            ->label('Grand Total')
+                            ->numeric()
+                            ->prefix('Rp')
+                            ->default(0)
+                            ->disabled()
+                            ->dehydrated(true),
+                    ])->columns(2),
             ]);
     }
 
     public static function table(Table $table): Table
-{
-    return $table
-        ->columns([
-            Tables\Columns\TextColumn::make('po_number')
-                ->label('No. PO')
-                ->searchable()
-                ->sortable(),
-            Tables\Columns\TextColumn::make('supplier.name')
-                ->label('Supplier')
-                ->searchable()
-                ->sortable(),
-            Tables\Columns\TextColumn::make('purchase_date')
-                ->label('Tanggal')
-                ->date()
-                ->sortable(),
-            Tables\Columns\TextColumn::make('subtotal')
-                ->label('Subtotal')
-                ->money('IDR')
-                ->sortable()
-                ->toggleable(),
-            Tables\Columns\TextColumn::make('tax_percentage')
-                ->label('Pajak (%)')
-                ->suffix('%')
-                ->sortable()
-                ->toggleable(),
-            Tables\Columns\TextColumn::make('grand_total')
-                ->label('Grand Total')
-                ->money('IDR')
-                ->sortable(),
-            Tables\Columns\TextColumn::make('status')
-                ->label('Status')
-                ->badge()
-                ->color(fn ($state) => match ($state) {
-                    'pending' => 'warning',
-                    'completed' => 'success',
-                    'cancelled' => 'danger',
-                })
-                ->formatStateUsing(fn ($state) => match ($state) {
-                    'pending' => 'Pending',
-                    'completed' => 'Completed',
-                    'cancelled' => 'Cancelled',
-                }),
-        ])
+    {
+        return $table
+            ->query(
+                PurchaseOrder::query()->withSum('items', 'quantity')
+            )
+            ->columns([
+                Tables\Columns\TextColumn::make('po_number')
+                    ->label('No. PO')
+                    ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('supplier.name')
+                    ->label('Supplier')
+                    ->searchable()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('purchase_date')
+                    ->label('Tanggal')
+                    ->date()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('items_sum_quantity')
+                    ->label('Total Barang')
+                    ->default(0)
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('subtotal')
+                    ->label('Subtotal')
+                    ->money('IDR')
+                    ->sortable()
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('tax_percentage')
+                    ->label('Pajak (%)')
+                    ->suffix('%')
+                    ->sortable()
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('grand_total')
+                    ->label('Grand Total')
+                    ->money('IDR')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('status')
+                    ->label('Status')
+                    ->badge()
+                    ->color(fn($state) => match ($state) {
+                        'pending' => 'warning',
+                        'completed' => 'success',
+                        'cancelled' => 'danger',
+                    })
+                    ->formatStateUsing(fn($state) => match ($state) {
+                        'pending' => 'Pending',
+                        'completed' => 'Completed',
+                        'cancelled' => 'Cancelled',
+                    }),
+            ])
             ->filters([
                 Tables\Filters\SelectFilter::make('supplier_id')
                     ->label('Supplier')
@@ -216,33 +289,33 @@ class PurchaseOrderResource extends Resource
                     ])
                     ->query(function ($query, array $data) {
                         return $query
-                            ->when($data['from'], fn ($q) => $q->whereDate('purchase_date', '>=', $data['from']))
-                            ->when($data['until'], fn ($q) => $q->whereDate('purchase_date', '<=', $data['until']));
+                            ->when($data['from'], fn($q) => $q->whereDate('purchase_date', '>=', $data['from']))
+                            ->when($data['until'], fn($q) => $q->whereDate('purchase_date', '<=', $data['until']));
                     }),
             ])
-             ->actions([
-            Tables\Actions\ViewAction::make(),
-            Tables\Actions\EditAction::make(),
-            Tables\Actions\Action::make('print_invoice')
-                ->label('Print Invoice')
-                ->icon('heroicon-o-printer')
-                ->color('success')
-                ->url(fn ($record) => route('purchase-order.invoice', $record))
-                ->openUrlInNewTab()
-                ->visible(fn ($record) => $record->status === 'completed'),
-            Tables\Actions\Action::make('complete')
-                ->label('Selesaikan')
-                ->icon('heroicon-o-check')
-                ->color('success')
-                ->requiresConfirmation()
-                ->action(function ($record) {
-                    $record->status = 'completed';
-                    $record->save();
-                    $record->updateProductStock();
-                })
-                ->visible(fn ($record) => $record->status === 'pending'),
-            Tables\Actions\DeleteAction::make(),
-        ])
+            ->actions([
+                Tables\Actions\ViewAction::make(),
+                Tables\Actions\EditAction::make(),
+                Tables\Actions\Action::make('print_invoice')
+                    ->label('Print Invoice')
+                    ->icon('heroicon-o-printer')
+                    ->color('success')
+                    ->url(fn($record) => route('purchase-order.invoice', $record))
+                    ->openUrlInNewTab()
+                    ->visible(fn($record) => $record->status === 'completed'),
+                Tables\Actions\Action::make('complete')
+                    ->label('Selesaikan')
+                    ->icon('heroicon-o-check')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->action(function ($record) {
+                        $record->status = 'completed';
+                        $record->save();
+                        $record->updateProductStock();
+                    })
+                    ->visible(fn($record) => $record->status === 'pending'),
+                Tables\Actions\DeleteAction::make(),
+            ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
@@ -254,7 +327,7 @@ class PurchaseOrderResource extends Resource
     {
         return [
             RelationManagers\ItemsRelationManager::class,
-            
+
         ];
     }
 
@@ -264,7 +337,7 @@ class PurchaseOrderResource extends Resource
             'index' => Pages\ListPurchaseOrders::route('/'),
             'create' => Pages\CreatePurchaseOrder::route('/create'),
             'view' => Pages\ViewPurchaseOrder::route('/{record}'),
-            
+
             'edit' => Pages\EditPurchaseOrder::route('/{record}/edit'),
         ];
     }
