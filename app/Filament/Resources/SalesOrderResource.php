@@ -1,14 +1,17 @@
 <?php
-// app/Filament/Resources/SalesOrderResource.php
+
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\SalesOrderResource\Pages;
 use App\Filament\Resources\SalesOrderResource\RelationManagers;
 use App\Models\SalesOrder;
 use App\Models\Customer;
-use Filament\Notifications\Notification;
+use App\Models\Product;
 use Filament\Forms;
+use Filament\Forms\Get;
+use Filament\Forms\Set;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -33,12 +36,14 @@ class SalesOrderResource extends Resource
                             ->label('No. Sales Order')
                             ->required()
                             ->unique(ignoreRecord: true)
-                            ->default(fn () => 'SO-' . date('Ymd') . '-' . str_pad(SalesOrder::whereDate('created_at', today())->count() + 1, 3, '0', STR_PAD_LEFT))
+                            ->default(fn() => 'SO-' . date('Ymd') . '-' . str_pad(SalesOrder::whereDate('created_at', today())->count() + 1, 3, '0', STR_PAD_LEFT))
                             ->maxLength(100),
                         Forms\Components\Select::make('customer_id')
                             ->label('Pelanggan')
                             ->relationship('customer', 'name')
                             ->required()
+                            ->searchable()
+                            ->preload()
                             ->createOptionForm([
                                 Forms\Components\TextInput::make('name')
                                     ->label('Nama Pelanggan')
@@ -69,7 +74,111 @@ class SalesOrderResource extends Resource
                             ->label('Catatan')
                             ->rows(3),
                     ])->columns(2),
-            ]);
+
+                // ============= ITEM PENJUALAN (WAJIB ADA DI CREATE) =============
+                Forms\Components\Section::make('Item Penjualan')
+                    ->schema([
+                        Forms\Components\Repeater::make('items')
+                            ->relationship()
+                            ->defaultItems(1)
+                            ->addable(true)
+                            ->deletable(true)
+                            ->schema([
+                                Forms\Components\Select::make('product_id')
+                                    ->label('Produk')
+                                    ->options(function () {
+                                        return Product::all()->mapWithKeys(function ($product) {
+                                            return [$product->id => "{$product->name} (Stok: {$product->current_stock}) - Rp " . number_format($product->selling_price, 0, ',', '.')];
+                                        });
+                                    })
+                                    ->searchable(['name', 'sku'])
+                                    ->required()
+                                    ->preload()
+                                    ->live(onBlur: true)
+                                    ->afterStateUpdated(function (Set $set, Get $get, $state) {
+                                        if (!$state) {
+                                            $set('unit_price', 0);
+                                            $set('quantity', 1);
+                                            $set('total_price', 0);
+                                            return;
+                                        }
+
+                                        $product = Product::find($state);
+                                        $unitPrice = $product ? (float) $product->selling_price : 0;
+                                        $set('unit_price', $unitPrice);
+                                        $set('quantity', 1);
+                                        $set('total_price', $unitPrice);
+
+                                        // Hitung ulang total tanpa menggunakan $this
+                                        $items = collect($get('../../items') ?? []);
+                                        $total = $items->sum(fn($item) => (float) ($item['total_price'] ?? 0));
+                                        $set('../../total_amount', $total);
+                                    })
+                                    ->columnSpan(2),
+
+                                Forms\Components\TextInput::make('quantity')
+                                    ->label('Jumlah')
+                                    ->numeric()
+                                    ->minValue(1)
+                                    ->required()
+                                    ->default(1)
+                                    ->live(onBlur: true)
+                                    ->afterStateUpdated(function (Set $set, Get $get, $state) {
+                                        $quantity = max(1, (int) $state);
+                                        $unitPrice = (float) ($get('unit_price') ?? 0);
+                                        $total = $quantity * $unitPrice;
+
+                                        $set('total_price', $total);
+
+                                        // Hitung ulang total
+                                        $items = collect($get('../../items') ?? []);
+                                        $totalAmount = $items->sum(fn($item) => (float) ($item['total_price'] ?? 0));
+                                        $set('../../total_amount', $totalAmount);
+                                    }),
+
+                                Forms\Components\TextInput::make('unit_price')
+                                    ->label('Harga Jual')
+                                    ->numeric()
+                                    ->step(0.01)
+                                    ->prefix('Rp')
+                                    ->readOnly()
+                                    ->dehydrated()
+                                    ->formatStateUsing(fn($state) => $state ? number_format($state, 0, ',', '.') : 0),
+
+                                Forms\Components\TextInput::make('total_price')
+                                    ->label('Subtotal')
+                                    ->numeric()
+                                    ->prefix('Rp')
+                                    ->readOnly()
+                                    ->dehydrated()
+                                    ->formatStateUsing(fn($state) => $state ? number_format($state, 0, ',', '.') : 0),
+                            ])
+                            ->columns(4)
+                            ->itemLabel(fn(array $state): ?string => $state['product_id'] ? Product::find($state['product_id'])?->name : null)
+                            ->addActionLabel('Tambah Item')
+                            ->live()
+                            ->afterStateUpdated(function (Set $set, Get $get, $state) {
+                                // Hitung total langsung di sini
+                                $items = collect($state);
+                                $total = $items->sum(fn($item) => (float) ($item['total_price'] ?? 0));
+                                $set('total_amount', $total);
+                            }),
+                    ]),
+
+                // ============= TOTAL PENJUALAN =============
+                Forms\Components\Section::make('Total Penjualan')
+                    ->schema([
+                        Forms\Components\TextInput::make('total_amount')
+                            ->label('Total Pembayaran')
+                            ->numeric()
+                            ->prefix('Rp')
+                            ->default(0)
+                            ->readOnly()
+                            ->dehydrated()
+                            ->formatStateUsing(fn($state) => $state ? number_format($state, 0, ',', '.') : 0),
+                    ]),
+            ])
+            ->columns(2);
     }
 
     public static function table(Table $table): Table
@@ -90,17 +199,17 @@ class SalesOrderResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('total_amount')
                     ->label('Total')
-                    ->money('IDR')
+                    ->formatStateUsing(fn($state) => 'Rp ' . number_format($state, 0, ',', '.'))
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->label('Status')
                     ->badge()
-                    ->color(fn ($state) => match ($state) {
+                    ->color(fn(string $state): string => match ($state) {
                         'pending' => 'warning',
                         'completed' => 'success',
                         'cancelled' => 'danger',
                     })
-                    ->formatStateUsing(fn ($state) => match ($state) {
+                    ->formatStateUsing(fn(string $state): string => match ($state) {
                         'pending' => 'Pending',
                         'completed' => 'Completed',
                         'cancelled' => 'Cancelled',
@@ -132,74 +241,70 @@ class SalesOrderResource extends Resource
                     ])
                     ->query(function ($query, array $data) {
                         return $query
-                            ->when($data['from'], fn ($q) => $q->whereDate('sale_date', '>=', $data['from']))
-                            ->when($data['until'], fn ($q) => $q->whereDate('sale_date', '<=', $data['until']));
+                            ->when($data['from'], fn($q) => $q->whereDate('sale_date', '>=', $data['from']))
+                            ->when($data['until'], fn($q) => $q->whereDate('sale_date', '<=', $data['until']));
                     }),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\Action::make('complete')
-    ->label('Selesaikan')
-    ->icon('heroicon-o-check')
-    ->color('success')
-    ->requiresConfirmation()
-    ->modalHeading('Konfirmasi Penyelesaian Penjualan')
-    ->modalDescription('Apakah Anda yakin ingin menyelesaikan penjualan ini? Stok produk akan dikurangi sesuai item yang dijual.')
-    ->action(function ($record) {
-        try {
-            // Cek stok sebelum complete
-            foreach ($record->items as $item) {
-                if ($item->product->current_stock < $item->quantity) {
-                    throw new \Exception("Stok {$item->product->name} tidak cukup. Tersedia: {$item->product->current_stock}, Dibutuhkan: {$item->quantity}");
-                }
-            }
-            
-            $record->status = 'completed';
-            $record->save();
-            $record->updateProductStock();
-            
-            // Notification sukses
-            Notification::make()
-                ->title('Penjualan berhasil diselesaikan')
-                ->success()
-                ->send();
-                
-        } catch (\Exception $e) {
-            // Notification error
-            Notification::make()
-                ->title('Error')
-                ->body($e->getMessage())
-                ->danger()
-                ->send();
-        }
-    })
-                    ->visible(fn ($record) => $record->status === 'pending'),
-                
-                
+                    ->label('Selesaikan')
+                    ->icon('heroicon-o-check')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->modalHeading('Konfirmasi Penyelesaian Penjualan')
+                    ->modalDescription('Apakah Anda yakin ingin menyelesaikan penjualan ini? Stok produk akan dikurangi sesuai item yang dijual.')
+                    ->action(function ($record) {
+                        try {
+                            foreach ($record->items as $item) {
+                                if ($item->product->current_stock < $item->quantity) {
+                                    throw new \Exception("Stok {$item->product->name} tidak cukup. Tersedia: {$item->product->current_stock}, Dibutuhkan: {$item->quantity}");
+                                }
+                            }
+
+                            $record->status = 'completed';
+                            $record->save();
+                            $record->updateProductStock();
+
+                            Notification::make()
+                                ->title('Penjualan berhasil diselesaikan')
+                                ->success()
+                                ->send();
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Error')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    })
+                    ->visible(fn($record) => $record->status === 'pending'),
+
                 Tables\Actions\Action::make('cancel')
-    ->label('Batalkan')
-    ->icon('heroicon-o-x-circle')
-    ->color('danger')
-    ->requiresConfirmation()
-    ->modalHeading('Konfirmasi Pembatalan')
-    ->modalDescription('Apakah Anda yakin ingin membatalkan penjualan ini? Jika sudah completed, stok akan dikembalikan.')
-    ->action(function ($record) {
-        $oldStatus = $record->status;
-        $record->status = 'cancelled';
-        $record->save();
-        
-        if ($oldStatus === 'completed') {
-            $record->rollbackProductStock();
-        }
-        
-        Notification::make()
-            ->title('Penjualan berhasil dibatalkan')
-            ->success()
-            ->send();
-    })
-    ->visible(fn ($record) => in_array($record->status, ['pending', 'completed'])),
-    Tables\Actions\DeleteAction::make(),
+                    ->label('Batalkan')
+                    ->icon('heroicon-o-x-circle')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Konfirmasi Pembatalan')
+                    ->modalDescription('Apakah Anda yakin ingin membatalkan penjualan ini? Jika sudah completed, stok akan dikembalikan.')
+                    ->action(function ($record) {
+                        $oldStatus = $record->status;
+                        $record->status = 'cancelled';
+                        $record->save();
+
+                        if ($oldStatus === 'completed') {
+                            $record->rollbackProductStock();
+                        }
+
+                        Notification::make()
+                            ->title('Penjualan berhasil dibatalkan')
+                            ->success()
+                            ->send();
+                    })
+                    ->visible(fn($record) => in_array($record->status, ['pending', 'completed'])),
+
+                Tables\Actions\DeleteAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
