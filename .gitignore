@@ -1,24 +1,37 @@
+# Dependencies
+vendor/
+composer.lock
+
+# Logs
 *.log
-.DS_Store
+storage/logs/
+
+# Environment
 .env
-.env.backup
-.env.production
-.phpactor.json
-.phpunit.result.cache
-/.fleet
-/.idea
-/.nova
-/.phpunit.cache
-/.vscode
-/.zed
-/auth.json
-/node_modules
-/public/build
-/public/hot
-/public/storage
-/storage/*.key
-/storage/pail
-/vendor
-Homestead.json
-Homestead.yaml
+.env.local
+.env.*
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
 Thumbs.db
+
+# Cache
+*.cache
+.cache/
+storage/framework/cache/
+bootstrap/cache/
+
+# Sessions
+storage/framework/sessions/
+
+# Compiled files
+*.php~
+*.swp
+
+# Filament specific
+filament/
+storage/app/filament/

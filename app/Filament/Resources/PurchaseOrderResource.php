@@ -26,6 +26,29 @@ class PurchaseOrderResource extends Resource
     public static function form(Form $form): Form
     {
         return $form
+            ->mutateDataUsing(function (array $data): array {
+                // Initialize default values if not present
+                if (!isset($data['discount_percentage'])) {
+                    $data['discount_percentage'] = 0;
+                }
+                if (!isset($data['tax_percentage'])) {
+                    $data['tax_percentage'] = 11; // Default to 11%
+                }
+                if (!isset($data['discount_amount'])) {
+                    $data['discount_amount'] = 0;
+                }
+                if (!isset($data['tax_amount'])) {
+                    $data['tax_amount'] = 0;
+                }
+                if (!isset($data['subtotal'])) {
+                    $data['subtotal'] = 0;
+                }
+                if (!isset($data['grand_total'])) {
+                    $data['grand_total'] = 0;
+                }
+                
+                return $data;
+            })
             ->schema([
                 Forms\Components\Section::make('Informasi Pembelian')
                     ->schema([
@@ -91,9 +114,9 @@ class PurchaseOrderResource extends Resource
                                         if ($state) {
                                             $product = \App\Models\Product::find($state);
 
-                                            $set('unit_price', $product?->price ?? 0);
+                                            $set('unit_price', $product?->purchase_price ?? 0);
                                             $set('quantity', 1);
-                                            $set('total_price', $product?->price ?? 0);
+                                            $set('total_price', $product?->purchase_price ?? 0);
                                         }
                                     }),
 
@@ -111,13 +134,13 @@ class PurchaseOrderResource extends Resource
                                     ->label('Harga Satuan')
                                     ->numeric()
                                     ->prefix('Rp')
-                                    ->disabled()
+                                    ->readOnly()
                                     ->dehydrated(true),
 
                                 Forms\Components\TextInput::make('total_price')
                                     ->label('Subtotal')
                                     ->numeric()
-                                    ->disabled()
+                                    ->readOnly()
                                     ->dehydrated(true),
                             ])
                             ->columns(4)
