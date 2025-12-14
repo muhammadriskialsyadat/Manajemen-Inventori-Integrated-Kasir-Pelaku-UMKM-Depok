@@ -75,7 +75,6 @@ class SalesOrderResource extends Resource
                             ->rows(3),
                     ])->columns(2),
 
-                // ============= ITEM PENJUALAN (WAJIB ADA DI CREATE) =============
                 Forms\Components\Section::make('Item Penjualan')
                     ->schema([
                         Forms\Components\Repeater::make('items')
@@ -109,7 +108,7 @@ class SalesOrderResource extends Resource
                                         $set('quantity', 1);
                                         $set('total_price', $unitPrice);
 
-                                        // Hitung ulang total tanpa menggunakan $this
+                                        // Hitung ulang total
                                         $items = collect($get('../../items') ?? []);
                                         $total = $items->sum(fn($item) => (float) ($item['total_price'] ?? 0));
                                         $set('../../total_amount', $total);
@@ -123,17 +122,18 @@ class SalesOrderResource extends Resource
                                     ->required()
                                     ->default(1)
                                     ->live(onBlur: true)
-                                    ->afterStateUpdated(function (Set $set, Get $get, $state) {
-                                        $quantity = max(1, (int) $state);
-                                        $unitPrice = (float) ($get('unit_price') ?? 0);
-                                        $total = $quantity * $unitPrice;
+                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
+                                        $price = (int) str_replace('.', '', $get('unit_price') ?? 0);
+                                        $set('total_price', $state * $price);
 
-                                        $set('total_price', $total);
+                                        // HITUNG ULANG TOTAL PEMBAYARAN
+                                        $items = $get('../../items') ?? [];
 
-                                        // Hitung ulang total
-                                        $items = collect($get('../../items') ?? []);
-                                        $totalAmount = $items->sum(fn($item) => (float) ($item['total_price'] ?? 0));
-                                        $set('../../total_amount', $totalAmount);
+                                        $total = collect($items)->sum(function ($item) {
+                                            return (int) ($item['total_price'] ?? 0);
+                                        });
+
+                                        $set('../../total_amount', $total);
                                     }),
 
                                 Forms\Components\TextInput::make('unit_price')
@@ -146,7 +146,7 @@ class SalesOrderResource extends Resource
                                     ->formatStateUsing(fn($state) => $state ? number_format($state, 0, ',', '.') : 0),
 
                                 Forms\Components\TextInput::make('total_price')
-                                    ->label('Subtotal')
+                                    ->label('Subtotal Item')
                                     ->numeric()
                                     ->prefix('Rp')
                                     ->readOnly()
@@ -158,14 +158,12 @@ class SalesOrderResource extends Resource
                             ->addActionLabel('Tambah Item')
                             ->live()
                             ->afterStateUpdated(function (Set $set, Get $get, $state) {
-                                // Hitung total langsung di sini
                                 $items = collect($state);
                                 $total = $items->sum(fn($item) => (float) ($item['total_price'] ?? 0));
                                 $set('total_amount', $total);
                             }),
                     ]),
 
-                // ============= TOTAL PENJUALAN =============
                 Forms\Components\Section::make('Total Penjualan')
                     ->schema([
                         Forms\Components\TextInput::make('total_amount')
@@ -174,8 +172,7 @@ class SalesOrderResource extends Resource
                             ->prefix('Rp')
                             ->default(0)
                             ->readOnly()
-                            ->dehydrated()
-                            ->formatStateUsing(fn($state) => $state ? number_format($state, 0, ',', '.') : 0),
+                            ->dehydrated(true), // <-- PERBAIKAN: TAMBAHKAN TRUE
                     ]),
             ])
             ->columns(2);
@@ -263,9 +260,9 @@ class SalesOrderResource extends Resource
                                 }
                             }
 
+                            // HANYA UBAH STATUS - biarkan model event yang handle stok
                             $record->status = 'completed';
-                            $record->save();
-                            $record->updateProductStock();
+                            $record->save(); // <-- INI AKAN MEMICU EVENT updating()
 
                             Notification::make()
                                 ->title('Penjualan berhasil diselesaikan')

@@ -89,12 +89,13 @@ class PurchaseOrderResource extends Resource
                                     ->searchable()
                                     ->required()
                                     ->preload()
-                                    ->live(onBlur: true)
+                                    ->live() // ✅ UBAH: live tanpa onBlur
                                     ->afterStateUpdated(function (Set $set, Get $get, $state) {
                                         if (!$state) {
                                             $set('unit_price', 0);
                                             $set('quantity', 1);
                                             $set('total_price', 0);
+                                            self::updateTotals($set, $get, $get('../../items'));
                                             return;
                                         }
 
@@ -104,6 +105,9 @@ class PurchaseOrderResource extends Resource
                                         $set('unit_price', $unitPrice);
                                         $set('quantity', 1);
                                         $set('total_price', $unitPrice);
+
+                                        // ✅ TRIGGER: Update totals setelah produk dipilih
+                                        self::updateTotals($set, $get, $get('../../items'));
                                     })
                                     ->columnSpan(2),
 
@@ -113,13 +117,14 @@ class PurchaseOrderResource extends Resource
                                     ->minValue(1)
                                     ->required()
                                     ->default(1)
-                                    ->live(onBlur: true)
-                                    ->afterStateUpdated(function (Set $set, Get $get, $state) {
-                                        $quantity = (int) $state;
-                                        $unitPrice = (float) ($get('unit_price') ?? 0);
-                                        $total = $quantity * $unitPrice;
+                                    ->live()
+                                    ->afterStateUpdated(function ($state, callable $set, callable $get) {
 
-                                        $set('total_price', $total);
+                                        $unitPrice = (float) ($get('unit_price') ?? 0);
+
+                                        $set('total_price', ((int) $state) * $unitPrice);
+
+                                        self::updateTotals($set, $get, $get('../../items'));
                                     }),
 
                                 Forms\Components\TextInput::make('unit_price')
@@ -127,39 +132,31 @@ class PurchaseOrderResource extends Resource
                                     ->numeric()
                                     ->prefix('Rp')
                                     ->readOnly()
-                                    ->dehydrated(),
+                                    ->dehydrated()
+                                    ->formatStateUsing(fn($state) => number_format($state ?? 0, 0, ',', '.')),
 
                                 Forms\Components\TextInput::make('total_price')
-                                    ->label('Subtotal')
+                                    ->label('Subtotal Item')
                                     ->numeric()
                                     ->prefix('Rp')
                                     ->readOnly()
-                                    ->dehydrated(),
+                                    ->dehydrated()
+                                    ->formatStateUsing(fn($state) => number_format($state ?? 0, 0, ',', '.')),
                             ])
+
                             ->columns(4)
-                            ->itemLabel(fn(array $state): ?string => $state['product_id'] ?? null)
+                            ->itemLabel(
+                                fn(array $state): ?string =>
+                                $state['product_id']
+                                    ? \App\Models\Product::find($state['product_id'])?->name
+                                    : null
+                            )
                             ->addActionLabel('Tambah Item')
                             ->live()
                             ->afterStateUpdated(function (Set $set, Get $get, $state) {
-                                $items = collect($state);
-                                $subtotal = $items->sum('total_price') ?: 0;
-
-                                $set('subtotal', $subtotal);
-
-                                // Recalculate discount and tax
-                                $discountPercentage = (float) ($get('discount_percentage') ?? 0);
-                                $taxPercentage = (float) ($get('tax_percentage') ?? 11);
-
-                                $discountAmount = ($subtotal * $discountPercentage) / 100;
-                                $set('discount_amount', $discountAmount);
-
-                                $afterDiscount = $subtotal - $discountAmount;
-                                $taxAmount = ($afterDiscount * $taxPercentage) / 100;
-                                $set('tax_amount', $taxAmount);
-
-                                $grandTotal = $afterDiscount + $taxAmount;
-                                $set('grand_total', $grandTotal);
+                                self::updateTotals($set, $get, $state);
                             }),
+
                     ]),
 
                 Forms\Components\Section::make('Pengaturan Pajak & Diskon')
@@ -171,19 +168,9 @@ class PurchaseOrderResource extends Resource
                             ->minValue(0)
                             ->maxValue(100)
                             ->suffix('%')
-                            ->live(onBlur: true)
+                            ->live() // ✅ UBAH: live tanpa onBlur agar lebih reactive
                             ->afterStateUpdated(function (Set $set, Get $get, $state) {
-                                $subtotal = (float) ($get('subtotal') ?? 0);
-                                $discountAmount = ($subtotal * (float) $state) / 100;
-                                $set('discount_amount', $discountAmount);
-
-                                $taxPercentage = (float) ($get('tax_percentage') ?? 11);
-                                $afterDiscount = $subtotal - $discountAmount;
-                                $taxAmount = ($afterDiscount * $taxPercentage) / 100;
-                                $set('tax_amount', $taxAmount);
-
-                                $grandTotal = $afterDiscount + $taxAmount;
-                                $set('grand_total', $grandTotal);
+                                self::updateTotals($set, $get, $get('items'));
                             }),
 
                         Forms\Components\TextInput::make('discount_amount')
@@ -192,7 +179,8 @@ class PurchaseOrderResource extends Resource
                             ->prefix('Rp')
                             ->default(0)
                             ->readOnly()
-                            ->dehydrated(),
+                            ->dehydrated()
+                            ->formatStateUsing(fn($state) => number_format($state ?? 0, 0, ',', '.')),
 
                         Forms\Components\Select::make('tax_percentage')
                             ->label('Pajak')
@@ -203,16 +191,9 @@ class PurchaseOrderResource extends Resource
                                 12 => 'PPN 12%',
                             ])
                             ->default(11)
-                            ->live(onBlur: true)
+                            ->live() // ✅ UBAH: live tanpa onBlur
                             ->afterStateUpdated(function (Set $set, Get $get, $state) {
-                                $subtotal = (float) ($get('subtotal') ?? 0);
-                                $discountAmount = (float) ($get('discount_amount') ?? 0);
-                                $afterDiscount = $subtotal - $discountAmount;
-                                $taxAmount = ($afterDiscount * (float) $state) / 100;
-                                $set('tax_amount', $taxAmount);
-
-                                $grandTotal = $afterDiscount + $taxAmount;
-                                $set('grand_total', $grandTotal);
+                                self::updateTotals($set, $get, $get('items'));
                             }),
 
                         Forms\Components\TextInput::make('tax_amount')
@@ -221,7 +202,8 @@ class PurchaseOrderResource extends Resource
                             ->prefix('Rp')
                             ->default(0)
                             ->readOnly()
-                            ->dehydrated(),
+                            ->dehydrated()
+                            ->formatStateUsing(fn($state) => number_format($state ?? 0, 0, ',', '.')),
                     ])->columns(2),
 
                 Forms\Components\Section::make('Total Pembelian')
@@ -232,7 +214,8 @@ class PurchaseOrderResource extends Resource
                             ->prefix('Rp')
                             ->default(0)
                             ->readOnly()
-                            ->dehydrated(),
+                            ->dehydrated(true)
+                            ->formatStateUsing(fn($state) => number_format($state ?? 0, 0, ',', '.')),
 
                         Forms\Components\TextInput::make('grand_total')
                             ->label('Grand Total')
@@ -240,11 +223,45 @@ class PurchaseOrderResource extends Resource
                             ->prefix('Rp')
                             ->default(0)
                             ->readOnly()
-                            ->dehydrated(),
+                            ->dehydrated(true)
+                            ->formatStateUsing(fn($state) => number_format($state ?? 0, 0, ',', '.')),
                     ])->columns(2),
             ])
             ->columns(2);
     }
+
+    // ✅ FUNGSI HELPER UNTUK HITUNG TOTAL
+    protected static function updateTotals(Set $set, Get $get, $items): void
+    {
+        $items = collect($items ?? []);
+
+        $subtotal = $items->sum(function ($item) {
+            $raw = $item['total_price'] ?? 0;
+            return (float) str_replace('.', '', $raw);
+        });
+
+        $set('subtotal', $subtotal);
+
+        // Diskon & Pajak
+        $discountPercentage = (float) ($get('discount_percentage') ?? 0);
+        $taxPercentage = (float) ($get('tax_percentage') ?? 11);
+
+        // Hitung diskon
+        $discountAmount = ($subtotal * $discountPercentage) / 100;
+        $set('discount_amount', $discountAmount);
+
+        // Setelah diskon
+        $afterDiscount = $subtotal - $discountAmount;
+
+        // Hitung pajak
+        $taxAmount = ($afterDiscount * $taxPercentage) / 100;
+        $set('tax_amount', $taxAmount);
+
+        // Grand total
+        $grandTotal = $afterDiscount + $taxAmount;
+        $set('grand_total', $grandTotal);
+    }
+
 
     public static function table(Table $table): Table
     {
@@ -279,7 +296,7 @@ class PurchaseOrderResource extends Resource
                     ->suffix('%')
                     ->sortable()
                     ->toggleable(),
-                Tables\Columns\TextColumn::make('grand_total')
+                Tables\Columns\TextColumn::make('total_amount')
                     ->label('Grand Total')
                     ->money('IDR')
                     ->sortable(),
@@ -325,13 +342,6 @@ class PurchaseOrderResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
-                Tables\Actions\Action::make('print_invoice')
-                    ->label('Print Invoice')
-                    ->icon('heroicon-o-printer')
-                    ->color('success')
-                    ->url(fn($record) => route('purchase-order.invoice', $record))
-                    ->openUrlInNewTab()
-                    ->visible(fn($record) => $record->status === 'completed'),
                 Tables\Actions\Action::make('complete')
                     ->label('Selesaikan')
                     ->icon('heroicon-o-check')
@@ -340,7 +350,6 @@ class PurchaseOrderResource extends Resource
                     ->action(function ($record) {
                         $record->status = 'completed';
                         $record->save();
-                        $record->updateProductStock();
                     })
                     ->visible(fn($record) => $record->status === 'pending'),
                 Tables\Actions\DeleteAction::make(),

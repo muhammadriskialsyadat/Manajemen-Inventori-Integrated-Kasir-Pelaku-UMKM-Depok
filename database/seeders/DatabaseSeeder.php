@@ -1,8 +1,9 @@
 <?php
-// database/seeders/DatabaseSeeder.php
+
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 use App\Models\Category;
 use App\Models\Supplier;
@@ -11,86 +12,100 @@ use App\Models\Product;
 
 class DatabaseSeeder extends Seeder
 {
+    /**
+     * Seed the application's database.
+     */
     public function run(): void
     {
-        // Create admin user
+        // 1. CREATE ADMIN USER
         User::create([
             'name' => 'Admin',
-            'email' => 'admin@heaven-spot-indo.com',
-            'password' => bcrypt('password'),
+            'email' => 'admin@waroeng.com',
+            'password' => Hash::make('password'),
             'role' => 'admin',
+            'is_active' => true,
         ]);
 
-        // Create categories
+        // 2. CREATE CATEGORIES DULU (PENTING!)
         $categories = [
-            ['name' => 'Cat Tembok', 'description' => 'Cat untuk dinding interior dan eksterior'],
-            ['name' => 'Cat Kayu', 'description' => 'Cat khusus untuk furniture kayu'],
-            ['name' => 'Cat Besi', 'description' => 'Cat anti karat untuk logam'],
-            ['name' => 'Cat Primer', 'description' => 'Cat dasar sebelum finishing'],
-            ['name' => 'Cat Semprot', 'description' => 'Cat dalam kemasan spray'],
+            ['name' => 'Cat Tembok', 'description' => 'Cat untuk interior dan eksterior tembok'],
+            ['name' => 'Cat Kayu', 'description' => 'Cat khusus untuk furniture dan kayu'],
+            ['name' => 'Cat Besi', 'description' => 'Cat anti karat untuk besi dan logam'],
+            ['name' => 'Thinner & Pelarut', 'description' => 'Thinner dan bahan pelarut cat'],
+            ['name' => 'Alat Cat', 'description' => 'Kuas, roller, dan alat bantu pengecatan'],
         ];
 
         foreach ($categories as $category) {
-            Category::create($category);
+            Category::updateOrCreate(
+                ['name' => $category['name']],
+                $category
+            );
         }
 
-        // Create suppliers
+        // 3. CREATE SUPPLIERS
         $suppliers = [
             [
-                'name' => 'PT Mowilex Indonesia',
+                'name' => 'PT. Mowilex Indonesia',
                 'contact_person' => 'Budi Santoso',
-                'phone' => '021-5555-0001',
-                'email' => 'budi@mowilex.com',
-                'address' => 'Jl. Industri No. 123, Jakarta'
+                'phone' => '021-12345678',
+                'email' => 'budi@mowilex.co.id',
+                'address' => 'Jakarta Selatan',
             ],
             [
-                'name' => 'CV Avitex Paint',
-                'contact_person' => 'Siti Rahayu',
-                'phone' => '021-5555-0002',
-                'email' => 'siti@avitex.com',
-                'address' => 'Jl. Raya Bogor No. 456, Depok'
+                'name' => 'PT. Avian Brands',
+                'contact_person' => 'Siti Nurhaliza',
+                'phone' => '021-87654321',
+                'email' => 'siti@avian.co.id',
+                'address' => 'Tangerang',
             ],
             [
-                'name' => 'Toko Cat Jaya',
-                'contact_person' => 'Ahmad Wijaya',
-                'phone' => '021-5555-0003',
-                'email' => 'ahmad@catjaya.com',
-                'address' => 'Jl. Kemang Raya No. 789, Jakarta Selatan'
+                'name' => 'CV. Jaya Sentosa',
+                'contact_person' => 'Ahmad Yani',
+                'phone' => '021-55555555',
+                'email' => 'ahmad@jayasentosa.com',
+                'address' => 'Bekasi',
             ],
         ];
 
         foreach ($suppliers as $supplier) {
-            Supplier::create($supplier);
+            Supplier::updateOrCreate(
+                ['name' => $supplier['name']],
+                $supplier
+            );
         }
 
-        // Create customers
+        // 4. CREATE CUSTOMERS
         $customers = [
             [
-                'name' => 'Toko Bangunan Sumber Rejeki',
-                'phone' => '021-7777-0001',
-                'email' => 'sumberrejeki@gmail.com',
-                'address' => 'Jl. Pasar Minggu No. 111, Jakarta Selatan'
+                'name' => 'Toko Bangunan Sejahtera',
+                'phone' => '081234567890',
+                'email' => 'sejahtera@gmail.com',
+                'address' => 'Jl. Sudirman No. 123, Jakarta',
             ],
             [
-                'name' => 'CV Mitra Konstruksi',
-                'phone' => '021-7777-0002',
-                'email' => 'mitra@konstruksi.com',
-                'address' => 'Jl. Sudirman No. 222, Jakarta Pusat'
+                'name' => 'CV. Mandiri Jaya',
+                'phone' => '081234567891',
+                'email' => 'mandiri@gmail.com',
+                'address' => 'Jl. Gatot Subroto No. 45, Bandung',
             ],
             [
-                'name' => 'Kontraktor Bangunan Jaya',
-                'phone' => '021-7777-0003',
-                'email' => 'jaya@kontraktor.com',
-                'address' => 'Jl. Thamrin No. 333, Jakarta Pusat'
+                'name' => 'UD. Sumber Rejeki',
+                'phone' => '081234567892',
+                'email' => 'rejeki@gmail.com',
+                'address' => 'Jl. Ahmad Yani No. 78, Surabaya',
             ],
         ];
 
         foreach ($customers as $customer) {
-            Customer::create($customer);
+            Customer::updateOrCreate(
+                ['phone' => $customer['phone']],
+                $customer
+            );
         }
 
-        // Create sample products
+        // 5. CREATE PRODUCTS (SETELAH CATEGORIES ADA!)
         $products = [
+            // Cat Tembok (category_id = 1)
             [
                 'name' => 'Mowilex Emulsion Paint',
                 'code' => 'MWX-001',
@@ -103,68 +118,139 @@ class DatabaseSeeder extends Seeder
                 'current_stock' => 25,
                 'purchase_price' => 85000,
                 'selling_price' => 95000,
-                'description' => 'Cat tembok berkualitas tinggi'
+                'description' => 'Cat tembok berkualitas tinggi',
             ],
             [
-                'name' => 'Avitex Wall Paint',
-                'code' => 'AVT-002',
+                'name' => 'Avian Catylac Interior',
+                'code' => 'AVN-001',
                 'category_id' => 1,
-                'brand' => 'Avitex',
-                'color' => 'Biru',
-                'size' => '1L',
-                'unit' => 'Kaleng',
+                'brand' => 'Avian',
+                'color' => 'Broken White',
+                'size' => '5L',
+                'unit' => 'Galon',
                 'minimum_stock' => 15,
                 'current_stock' => 30,
-                'purchase_price' => 45000,
-                'selling_price' => 50000,
-                'description' => 'Cat tembok ekonomis berkualitas'
+                'purchase_price' => 150000,
+                'selling_price' => 170000,
+                'description' => 'Cat interior premium',
             ],
             [
-                'name' => 'Wood Stain Natural',
-                'code' => 'WS-003',
+                'name' => 'Dulux Weathershield',
+                'code' => 'DLX-001',
+                'category_id' => 1,
+                'brand' => 'Dulux',
+                'color' => 'Ivory',
+                'size' => '2.5L',
+                'unit' => 'Kaleng',
+                'minimum_stock' => 12,
+                'current_stock' => 20,
+                'purchase_price' => 120000,
+                'selling_price' => 140000,
+                'description' => 'Cat eksterior tahan cuaca',
+            ],
+
+            // Cat Kayu (category_id = 2)
+            [
+                'name' => 'Avian Wood Stain',
+                'code' => 'AVN-WS-001',
                 'category_id' => 2,
-                'brand' => 'Biovarnish',
-                'color' => 'Natural',
+                'brand' => 'Avian',
+                'color' => 'Teak',
                 'size' => '1L',
                 'unit' => 'Kaleng',
                 'minimum_stock' => 8,
-                'current_stock' => 20,
-                'purchase_price' => 65000,
-                'selling_price' => 75000,
-                'description' => 'Pewarna kayu alami'
+                'current_stock' => 15,
+                'purchase_price' => 45000,
+                'selling_price' => 55000,
+                'description' => 'Cat kayu transparan warna kayu jati',
             ],
             [
-                'name' => 'Anti Rust Paint',
-                'code' => 'AR-004',
-                'category_id' => 3,
-                'brand' => 'Rust Guard',
-                'color' => 'Merah',
-                'size' => '1L',
-                'unit' => 'Kaleng',
-                'minimum_stock' => 12,
-                'current_stock' => 18,
-                'purchase_price' => 55000,
-                'selling_price' => 65000,
-                'description' => 'Cat anti karat untuk logam'
-            ],
-            [
-                'name' => 'Primer Sealer',
-                'code' => 'PR-005',
-                'category_id' => 4,
-                'brand' => 'Base Coat',
-                'color' => 'Transparan',
+                'name' => 'Propan PU Clear Gloss',
+                'code' => 'PRP-001',
+                'category_id' => 2,
+                'brand' => 'Propan',
+                'color' => 'Clear',
                 'size' => '1L',
                 'unit' => 'Kaleng',
                 'minimum_stock' => 10,
-                'current_stock' => 15,
-                'purchase_price' => 40000,
-                'selling_price' => 48000,
-                'description' => 'Primer dasar untuk finishing'
+                'current_stock' => 18,
+                'purchase_price' => 65000,
+                'selling_price' => 75000,
+                'description' => 'Cat kayu polyurethane mengkilap',
+            ],
+
+            // Cat Besi (category_id = 3)
+            [
+                'name' => 'Avitex Anti Rust Primer',
+                'code' => 'AVT-001',
+                'category_id' => 3,
+                'brand' => 'Avitex',
+                'color' => 'Grey',
+                'size' => '1L',
+                'unit' => 'Kaleng',
+                'minimum_stock' => 10,
+                'current_stock' => 12,
+                'purchase_price' => 50000,
+                'selling_price' => 60000,
+                'description' => 'Cat dasar anti karat untuk besi',
+            ],
+
+            // Thinner (category_id = 4)
+            [
+                'name' => 'Thinner A Special',
+                'code' => 'THN-001',
+                'category_id' => 4,
+                'brand' => 'Generic',
+                'color' => null,
+                'size' => '1L',
+                'unit' => 'Botol',
+                'minimum_stock' => 20,
+                'current_stock' => 50,
+                'purchase_price' => 15000,
+                'selling_price' => 18000,
+                'description' => 'Thinner khusus untuk cat minyak',
+            ],
+
+            // Alat Cat (category_id = 5)
+            [
+                'name' => 'Kuas Tembok 3 inch',
+                'code' => 'KUS-001',
+                'category_id' => 5,
+                'brand' => 'Generic',
+                'color' => null,
+                'size' => '3 inch',
+                'unit' => 'Pcs',
+                'minimum_stock' => 30,
+                'current_stock' => 45,
+                'purchase_price' => 8000,
+                'selling_price' => 12000,
+                'description' => 'Kuas tembok ukuran 3 inch',
+            ],
+            [
+                'name' => 'Roller Paint 7 inch',
+                'code' => 'ROL-001',
+                'category_id' => 5,
+                'brand' => 'Generic',
+                'color' => null,
+                'size' => '7 inch',
+                'unit' => 'Pcs',
+                'minimum_stock' => 25,
+                'current_stock' => 40,
+                'purchase_price' => 15000,
+                'selling_price' => 20000,
+                'description' => 'Roller cat untuk tembok luas',
             ],
         ];
 
         foreach ($products as $product) {
-            Product::create($product);
+            Product::updateOrCreate(
+                ['code' => $product['code']], // Cek berdasarkan code
+                $product // Data yang akan di-insert/update
+            );
         }
+
+        $this->command->info('✅ Database seeding completed successfully!');
+        $this->command->info('📧 Login: admin@waroeng.com');
+        $this->command->info('🔑 Password: password');
     }
 }

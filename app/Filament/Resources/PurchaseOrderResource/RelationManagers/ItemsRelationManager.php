@@ -1,5 +1,6 @@
 <?php
 // app/Filament/Resources/PurchaseOrderResource/RelationManagers/ItemsRelationManager.php
+
 namespace App\Filament\Resources\PurchaseOrderResource\RelationManagers;
 
 use Filament\Forms;
@@ -7,17 +8,20 @@ use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
-use App\Models\Product;
-use Filament\Forms\Get;
+use Illuminate\Database\Eloquent\Model;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ItemsRelationManager extends RelationManager
 {
     protected static string $relationship = 'items';
-
     protected static ?string $title = 'Item Pembelian';
 
+    public function canCreate(): bool
+    {
+        return false;
+    }
     public function form(Form $form): Form
     {
         return $form
@@ -27,77 +31,61 @@ class ItemsRelationManager extends RelationManager
                     ->relationship('product', 'name')
                     ->required()
                     ->searchable()
-                    ->getOptionLabelFromRecordUsing(fn ($record) => "{$record->name} ({$record->code}) - Stok: {$record->current_stock}")
-                    ->live()
+                    ->preload()
+                    ->reactive()
                     ->afterStateUpdated(function ($state, callable $set) {
                         if ($state) {
-                            $product = Product::find($state);
-                            if ($product) {
-                                $set('unit_price', $product->purchase_price);
-                                $set('current_stock', $product->current_stock);
-                                
-                                // Debug log
-                                Log::info("Product selected for purchase: {$product->name}, Stock: {$product->current_stock}");
-                            }
+                            $product = \App\Models\Product::find($state);
+                            $set('unit_price', $product->purchase_price ?? 0);
+                            $set('quantity', 1);
+                            $set('total_price', $product->purchase_price ?? 0);
                         }
                     }),
-                    
-                Forms\Components\Hidden::make('current_stock')
-                    ->default(0),
-                    
                 Forms\Components\TextInput::make('quantity')
                     ->label('Jumlah')
                     ->numeric()
                     ->required()
                     ->minValue(1)
-                    ->live()
+                    ->default(1)
+                    ->reactive()
                     ->afterStateUpdated(function ($state, callable $get, callable $set) {
-                        $unitPrice = $get('unit_price');
-                        if ($state && $unitPrice) {
-                            $set('total_price', $state * $unitPrice);
-                        }
-                    })
-                    ->helperText(function (Get $get) {
-                        $stock = $get('current_stock');
-                        return $stock ? "Stok saat ini: {$stock}" : '';
+                        $quantity = (int) $state;
+                        $unitPrice = (float) $get('unit_price');
+                        $set('total_price', $quantity * $unitPrice);
                     }),
-                    
                 Forms\Components\TextInput::make('unit_price')
                     ->label('Harga Satuan')
                     ->numeric()
-                    ->prefix('Rp')
                     ->required()
-                    ->minValue(0)
-                    ->live()
+                    ->prefix('Rp')
+                    ->reactive()
                     ->afterStateUpdated(function ($state, callable $get, callable $set) {
-                        $quantity = $get('quantity');
-                        if ($state && $quantity) {
-                            $set('total_price', $state * $quantity);
-                        }
+                        $quantity = (int) $get('quantity');
+                        $unitPrice = (float) $state;
+                        $set('total_price', $quantity * $unitPrice);
                     }),
-                    
                 Forms\Components\TextInput::make('total_price')
                     ->label('Total Harga')
                     ->numeric()
                     ->prefix('Rp')
-                    ->required()
-                    ->minValue(0)
                     ->disabled()
-                    ->dehydrated(true),
+                    ->dehydrated(),
             ]);
     }
 
     public function table(Table $table): Table
     {
         return $table
-            ->recordTitleAttribute('product.name')
             ->columns([
                 Tables\Columns\TextColumn::make('product.name')
-                    ->label('Produk'),
+                    ->label('Produk')
+                    ->searchable(),
                 Tables\Columns\TextColumn::make('product.code')
-                    ->label('Kode'),
+                    ->label('Kode')
+                    ->searchable(),
                 Tables\Columns\TextColumn::make('quantity')
-                    ->label('Jumlah'),
+                    ->label('Jumlah')
+                    ->numeric(),
                 Tables\Columns\TextColumn::make('unit_price')
                     ->label('Harga Satuan')
                     ->money('IDR'),
@@ -107,143 +95,123 @@ class ItemsRelationManager extends RelationManager
             ])
             ->headerActions([
                 Tables\Actions\CreateAction::make()
-                    ->mutateFormDataUsing(function (array $data): array {
-                        // Pastikan total_price dihitung
-                        $data['total_price'] = $data['quantity'] * $data['unit_price'];
-                        
-                        // Debug log
-                        Log::info("Creating purchase item with data: " . json_encode($data));
-                        
-                        return $data;
-                    })
-                    ->after(function ($record) {
-                        try {
-                            // Debug log
-                            Log::info("Purchase item created with ID: {$record->id}, PO Status: {$this->ownerRecord->status}");
-                            
-                            // AUTO-CALL method untuk handle PO completed
-                            if ($this->ownerRecord->status === 'completed') {
-                                Log::info("Calling updateStockForNewItems for PO: {$this->ownerRecord->po_number}");
-                                $this->ownerRecord->updateStockForNewItems();
-                                
-                                // Notification sukses
-                                Notification::make()
-                                    ->title('Item berhasil ditambahkan')
-                                    ->body('Stok produk telah ditambah otomatis karena PO sudah completed')
-                                    ->success()
-                                    ->send();
-                            } else {
-                                // Hanya update total jika PO belum completed
-                                $this->ownerRecord->calculateTotal();
-                                
-                                Notification::make()
-                                    ->title('Item berhasil ditambahkan')
-                                    ->body('Item ditambahkan ke PO. Stok akan ditambah saat PO diselesaikan.')
-                                    ->info()
-                                    ->send();
-                            }
-                        } catch (\Exception $e) {
-                            // Debug log error
-                            Log::error("Error in purchase item after() hook: " . $e->getMessage());
-                            
-                            // Notification error
-                            Notification::make()
-                                ->title('Error menambah item')
-                                ->body($e->getMessage())
-                                ->danger()
-                                ->send();
+                    ->after(function () {
+                        $po = $this->getOwnerRecord();
+                        $po->calculateTotal();
+
+                        if ($po->status === 'completed') {
+                            $po->updateStockForNewItems();
                         }
                     }),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()
-                    ->mutateFormDataUsing(function (array $data): array {
-                        $data['total_price'] = $data['quantity'] * $data['unit_price'];
+                    ->mutateRecordDataUsing(function (array $data, $record): array {
+                        // Simpan old quantity SEBELUM form dibuka
+                        cache()->put("edit_po_item_{$record->id}_old_qty", $record->quantity, 300);
+                        Log::info("=== PO ITEM EDIT FORM OPENED ===");
+                        Log::info("Item ID: {$record->id}, Saved Old Qty: {$record->quantity}");
                         return $data;
                     })
-                    ->after(function () {
-                        $this->ownerRecord->calculateTotal();
-                        
-                        Notification::make()
-                            ->title('Item berhasil diperbarui')
-                            ->success()
-                            ->send();
-                    }),
-                    
-                Tables\Actions\DeleteAction::make()
-                    ->requiresConfirmation()
-                    ->modalHeading('Hapus Item')
-                    ->modalDescription('Apakah Anda yakin ingin menghapus item ini? Jika PO sudah completed, stok akan dikurangi.')
-                    ->before(function ($record) {
-                        try {
-                            if ($this->ownerRecord->status === 'completed') {
-                                Log::info("Rolling back stock for deleted purchase item: {$record->id}");
-                                $this->ownerRecord->rollbackStockForDeletedItem($record);
-                                
+                    ->after(function ($record) {
+                        $po = $this->getOwnerRecord();
+
+                        Log::info("=== PO ITEM AFTER SAVE ===");
+                        Log::info("Item ID: {$record->id}, New Qty: {$record->quantity}");
+
+                        $po->calculateTotal();
+
+                        if ($po->status === 'completed') {
+                            $oldQty = cache()->get("edit_po_item_{$record->id}_old_qty");
+
+                            if ($oldQty === null) {
+                                Log::error("Old quantity not found in cache!");
                                 Notification::make()
-                                    ->title('Stok dikurangi')
-                                    ->body("Stok {$record->product->name} telah dikurangi sebanyak {$record->quantity} unit")
-                                    ->info()
+                                    ->title('Error')
+                                    ->body('Gagal mengambil data quantity lama. Silakan refresh halaman.')
+                                    ->danger()
                                     ->send();
+                                return;
                             }
-                        } catch (\Exception $e) {
-                            Log::error("Error rolling back purchase stock: " . $e->getMessage());
-                            
-                            Notification::make()
-                                ->title('Error menghapus item')
-                                ->body($e->getMessage())
-                                ->danger()
-                                ->send();
-                                
-                            $this->halt();
+
+                            $newQty = $record->quantity;
+                            $diff = $newQty - $oldQty;
+
+                            Log::info("Processing stock update: Old={$oldQty}, New={$newQty}, Diff={$diff}");
+
+                            if ($diff != 0) {
+                                $this->updateStockForEditedItem($record, $diff, $oldQty, $newQty);
+                            } else {
+                                Log::info("No quantity change detected");
+                            }
+
+                            cache()->forget("edit_po_item_{$record->id}_old_qty");
+                        }
+                    }),
+                Tables\Actions\DeleteAction::make()
+                    ->before(function ($record) {
+                        $po = $this->getOwnerRecord();
+
+                        if ($po->status === 'completed') {
+                            $po->rollbackStockForDeletedItem($record);
                         }
                     })
                     ->after(function () {
-                        $this->ownerRecord->calculateTotal();
-                        
-                        Notification::make()
-                            ->title('Item berhasil dihapus')
-                            ->success()
-                            ->send();
+                        $po = $this->getOwnerRecord();
+                        $po->calculateTotal();
                     }),
-            ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make()
-                        ->requiresConfirmation()
-                        ->before(function ($records) {
-                            try {
-                                foreach ($records as $record) {
-                                    if ($this->ownerRecord->status === 'completed') {
-                                        $this->ownerRecord->rollbackStockForDeletedItem($record);
-                                    }
-                                }
-                                
-                                if ($this->ownerRecord->status === 'completed') {
-                                    $totalItems = count($records);
-                                    Notification::make()
-                                        ->title('Stok dikurangi')
-                                        ->body("Stok untuk {$totalItems} item telah dikurangi")
-                                        ->info()
-                                        ->send();
-                                }
-                            } catch (\Exception $e) {
-                                Notification::make()
-                                    ->title('Error menghapus items')
-                                    ->body($e->getMessage())
-                                    ->danger()
-                                    ->send();
-                                    
-                                $this->halt();
-                            }
-                        })
-                        ->after(function () {
-                            $this->ownerRecord->calculateTotal();
-                        }),
-                ]),
-            ])
-            ->emptyStateHeading('Belum Ada Item')
-            ->emptyStateDescription('Tambahkan item produk untuk purchase order ini.')
-            ->emptyStateIcon('heroicon-o-cube');
+            ]);
+    }
+
+    protected function updateStockForEditedItem($item, $diff, $oldQty, $newQty): void
+    {
+        DB::transaction(function () use ($item, $diff, $oldQty, $newQty) {
+            $product = $item->product()->lockForUpdate()->first();
+            $previousStock = $product->current_stock;
+
+            Log::info("=== STOCK UPDATE START ===");
+            Log::info("Product: {$product->name} (ID: {$product->id})");
+            Log::info("Previous Stock: {$previousStock}");
+            Log::info("Qty Change: {$oldQty} → {$newQty} (diff: {$diff})");
+
+            if ($diff > 0) {
+                // Qty bertambah = stok bertambah
+                $newStock = $previousStock + abs($diff);
+                $type = 'in';
+                $notes = "Edit PO item (qty {$oldQty}→{$newQty}) - PO: {$item->purchaseOrder->po_number}";
+            } else {
+                // Qty berkurang = stok berkurang
+                $newStock = $previousStock - abs($diff);
+                $type = 'out';
+                $notes = "Edit PO item (qty {$oldQty}→{$newQty}) - PO: {$item->purchaseOrder->po_number}";
+            }
+
+            $product->current_stock = $newStock;
+            $product->save();
+
+            Log::info("New Stock: {$newStock}");
+
+            $movement = \App\Models\StockMovement::create([
+                'product_id' => $product->id,
+                'user_id' => auth()->id() ?? 1,
+                'type' => $type,
+                'reference_type' => 'purchase',
+                'reference_id' => $item->purchase_order_id,
+                'quantity' => abs($diff),
+                'previous_stock' => $previousStock,
+                'current_stock' => $newStock,
+                'notes' => $notes,
+            ]);
+
+            Log::info("Stock Movement Created: ID={$movement->id}, Type={$type}, Qty=" . abs($diff));
+            Log::info("=== STOCK UPDATE END ===");
+
+            Notification::make()
+                ->title('✅ Stock Updated!')
+                ->body("{$product->name}: {$previousStock} → {$newStock}")
+                ->success()
+                ->duration(5000)
+                ->send();
+        });
     }
 }

@@ -17,7 +17,6 @@ class Product extends Model
         'code',
         'category_id',
         'brand',
-        'color',
         'size',
         'unit',
         'minimum_stock',
