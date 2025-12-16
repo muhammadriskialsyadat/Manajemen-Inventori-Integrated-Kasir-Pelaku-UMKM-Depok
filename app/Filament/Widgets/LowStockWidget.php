@@ -18,10 +18,13 @@ class LowStockWidget extends BaseWidget
     public function table(Table $table): Table
     {
         return $table
+            ->searchable()
             ->query(
                 Product::query()
-                    ->whereColumn('current_stock', '<=', 'minimum_stock')
-                    ->orWhere('current_stock', '<=', 0)
+                    ->where(function ($query) {
+                        $query->whereColumn('current_stock', '<=', 'minimum_stock')
+                            ->orWhere('current_stock', '<=', 0);
+                    })
             )
             ->columns([
                 Tables\Columns\TextColumn::make('code')

@@ -25,16 +25,16 @@ class ReportExportController extends Controller
         $reportType = $request->input('report_type');
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
-        
+
         $reportData = $this->generateReportData($reportType, $startDate, $endDate);
-        
+
         // Configure DomPDF
         $options = new Options();
         $options->set('defaultFont', 'Arial');
         $options->set('isRemoteEnabled', true);
-        
+
         $dompdf = new Dompdf($options);
-        
+
         // Generate HTML for PDF
         $html = view('reports.pdf-template', [
             'reportData' => $reportData,
@@ -42,32 +42,36 @@ class ReportExportController extends Controller
             'startDate' => $startDate,
             'endDate' => $endDate
         ])->render();
-        
+
         $dompdf->loadHtml($html);
         $dompdf->setPaper('A4', 'portrait');
         $dompdf->render();
-        
+
         $filename = $this->getFilename($reportType, 'pdf');
-        
-        return $dompdf->stream($filename);
+
+        $pdfOutput = $dompdf->output();
+
+        return response($pdfOutput, 200)
+            ->header('Content-Type', 'application/pdf')
+            ->header('Content-Disposition', 'inline; filename="' . $filename . '"');
     }
-    
+
     public function exportExcel(Request $request)
     {
         $reportType = $request->input('report_type');
         $startDate = $request->input('start_date');
         $endDate = $request->input('end_date');
-        
+
         $reportData = $this->generateReportData($reportType, $startDate, $endDate);
-        
+
         $filename = $this->getFilename($reportType, 'xlsx');
-        
+
         return Excel::download(
             new ReportExport($reportData, $reportType),
             $filename
         );
     }
-    
+
     private function generateReportData($reportType, $startDate, $endDate)
     {
         return match ($reportType) {
@@ -78,11 +82,11 @@ class ReportExportController extends Controller
             default => null,
         };
     }
-    
+
     private function generateStockReport()
     {
         $products = Product::with('category')->orderBy('name')->get();
-        
+
         return [
             'type' => 'stock',
             'products' => $products,
@@ -91,19 +95,19 @@ class ReportExportController extends Controller
             'out_of_stock_products' => $products->filter(fn($p) => $p->current_stock <= 0),
         ];
     }
-    
+
     private function generateSalesReport($startDate, $endDate)
     {
         $start = Carbon::parse($startDate)->format('Y-m-d');
         $end = Carbon::parse($endDate)->format('Y-m-d');
-        
+
         $sales = SalesOrder::with(['customer', 'items.product'])
             ->whereDate('sale_date', '>=', $start)
             ->whereDate('sale_date', '<=', $end)
             ->where('status', 'completed')
             ->orderBy('sale_date', 'desc')
             ->get();
-            
+
         return [
             'type' => 'sales',
             'sales' => $sales,
@@ -112,19 +116,19 @@ class ReportExportController extends Controller
             'period' => ['start' => $startDate, 'end' => $endDate],
         ];
     }
-    
+
     private function generatePurchaseReport($startDate, $endDate)
     {
         $start = Carbon::parse($startDate)->format('Y-m-d');
         $end = Carbon::parse($endDate)->format('Y-m-d');
-        
+
         $purchases = PurchaseOrder::with(['supplier', 'items.product'])
             ->whereDate('purchase_date', '>=', $start)
             ->whereDate('purchase_date', '<=', $end)
             ->where('status', 'completed')
             ->orderBy('purchase_date', 'desc')
             ->get();
-            
+
         return [
             'type' => 'purchase',
             'purchases' => $purchases,
@@ -133,18 +137,18 @@ class ReportExportController extends Controller
             'period' => ['start' => $startDate, 'end' => $endDate],
         ];
     }
-    
+
     private function generateStockMovementReport($startDate, $endDate)
     {
         $start = Carbon::parse($startDate)->startOfDay();
         $end = Carbon::parse($endDate)->endOfDay();
-        
+
         $movements = StockMovement::with('product')
             ->where('created_at', '>=', $start)
             ->where('created_at', '<=', $end)
             ->orderBy('created_at', 'desc')
             ->get();
-            
+
         return [
             'type' => 'stock_movement',
             'movements' => $movements,
@@ -154,19 +158,19 @@ class ReportExportController extends Controller
             'period' => ['start' => $startDate, 'end' => $endDate],
         ];
     }
-    
+
     private function getFilename($reportType, $extension)
     {
         $typeNames = [
             'stock' => 'Laporan_Stok',
-            'sales' => 'Laporan_Penjualan', 
+            'sales' => 'Laporan_Penjualan',
             'purchase' => 'Laporan_Pembelian',
             'stock_movement' => 'Laporan_Pergerakan_Stok'
         ];
-        
+
         $typeName = $typeNames[$reportType] ?? 'Laporan';
         $date = now()->format('Y-m-d_H-i');
-        
+
         return "{$typeName}_{$date}.{$extension}";
     }
 }
@@ -176,13 +180,13 @@ class ReportExport implements FromCollection, WithHeadings, WithMapping, WithSty
 {
     protected $reportData;
     protected $reportType;
-    
+
     public function __construct($reportData, $reportType)
     {
         $this->reportData = $reportData;
         $this->reportType = $reportType;
     }
-    
+
     public function collection()
     {
         return match ($this->reportType) {
@@ -193,7 +197,7 @@ class ReportExport implements FromCollection, WithHeadings, WithMapping, WithSty
             default => collect([]),
         };
     }
-    
+
     public function headings(): array
     {
         return match ($this->reportType) {
@@ -204,7 +208,7 @@ class ReportExport implements FromCollection, WithHeadings, WithMapping, WithSty
             default => [],
         };
     }
-    
+
     public function map($row): array
     {
         return match ($this->reportType) {
@@ -242,7 +246,7 @@ class ReportExport implements FromCollection, WithHeadings, WithMapping, WithSty
             default => [],
         };
     }
-    
+
     public function styles(Worksheet $sheet)
     {
         return [
