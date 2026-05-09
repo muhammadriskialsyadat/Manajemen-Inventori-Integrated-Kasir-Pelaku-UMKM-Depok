@@ -27,6 +27,11 @@ class StockMovementResource extends Resource
     // ✅ TAMBAHKAN INI: Polling otomatis setiap 10 detik
     protected static ?string $pollingInterval = '10s';
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->hasAnyRole(['Owner', 'Gudang', 'Kasir', 'Akuntan']) ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -287,11 +292,6 @@ class StockMovementResource extends Resource
             'previous_stock' => $previousStock,
             'current_stock' => $newStock,
         ]));
-    }
-
-    public static function canCreate(): bool
-    {
-        return true;
     }
 
     public static function getNavigationBadge(): ?string

@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(composer require *)",
+      "Bash(php artisan *)",
+      "Bash(findstr \"DB_\")",
+      "Bash(Get-Content .env)",
+      "Bash(Select-String \"DB_\")"
+    ]
+  }
+}

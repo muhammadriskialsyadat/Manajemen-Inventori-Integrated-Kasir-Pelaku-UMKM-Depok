@@ -24,6 +24,11 @@ class PurchaseOrderResource extends Resource
 
     protected static ?string $navigationLabel = 'Pembelian';
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->hasAnyRole(['Owner', 'Gudang', 'Akuntan']) ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form

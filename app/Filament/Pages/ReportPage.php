@@ -28,6 +28,11 @@ class ReportPage extends Page implements HasForms
 
     protected static ?string $navigationGroup = 'Laporan';
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->hasAnyRole(['Owner', 'Akuntan']) ?? false;
+    }
+
     public ?array $data = [];
     
     public $reportData = null;

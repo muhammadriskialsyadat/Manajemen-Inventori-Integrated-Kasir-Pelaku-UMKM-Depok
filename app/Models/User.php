@@ -8,16 +8,16 @@ use Illuminate\Notifications\Notifiable;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable implements FilamentUser
 {
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, HasRoles;
 
     protected $fillable = [
         'name',
         'email',
         'password',
-        'role',
         'phone',
         'address',
         'is_active',
@@ -35,7 +35,6 @@ class User extends Authenticatable implements FilamentUser
     ];
 
     protected $attributes = [
-        'role' => 'staff',
         'is_active' => true,
     ];
 
@@ -58,22 +57,23 @@ class User extends Authenticatable implements FilamentUser
     // ========== FILAMENT ACCESS ==========
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->is_active && in_array($this->role, ['admin', 'manager', 'staff']);
+        return $this->is_active && $this->hasAnyRole(['Owner', 'Kasir', 'Gudang', 'Akuntan']);
     }
 
     // ========== HELPER METHODS ==========
     public function canAdjustStock(): bool
     {
-        return $this->is_active && in_array($this->role, ['admin', 'manager']);
+        return $this->is_active && $this->hasAnyRole(['Owner', 'Gudang']);
     }
 
     public function getRoleBadgeColorAttribute(): string
     {
-        return match ($this->role) {
-            'admin' => 'success',
-            'manager' => 'warning',
-            'staff' => 'info',
-            default => 'gray'
+        return match ($this->getRoleNames()->first()) {
+            'Owner'   => 'success',
+            'Kasir'   => 'warning',
+            'Gudang'  => 'info',
+            'Akuntan' => 'gray',
+            default   => 'gray',
         };
     }
 }

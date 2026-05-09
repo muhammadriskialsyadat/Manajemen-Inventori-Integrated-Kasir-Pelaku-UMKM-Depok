@@ -31,12 +31,12 @@ class AdminPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Blue,
             ])
-            ->brandName('WAROENG SMART')
+            ->brandName('Heaven Spot Indonesia')
             ->brandLogo(fn() => new HtmlString('
                 <div style="text-align: center;">
-                    <div style="font-size: 1.2rem; font-weight: 900; line-height: 1.2;">
-                        <span style="color: #2563eb;">WAROENG</span>
-                        <span style="color: #9333ea; margin: 0 2px;">SMART</span>
+                    <div style="font-size: 1.1rem; font-weight: 900; line-height: 1.2;">
+                        <span style="color: #2563eb;">Heaven Spot</span>
+                        <span style="color: #f97316; margin-left: 4px;">Indonesia</span>
                     </div>
                 </div>
             '))
@@ -49,11 +49,6 @@ class AdminPanelProvider extends PanelProvider
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
                 Widgets\AccountWidget::class,
-                \App\Filament\Widgets\StatsOverviewWidget::class,
-                \App\Filament\Widgets\LowStockWidget::class,
-                \App\Filament\Widgets\RecentStockMovementsWidget::class,
-                //\App\Filament\Widgets\RecentTransactionsWidget::class,
-                // TAMBAHKAN INI
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -74,6 +69,7 @@ class AdminPanelProvider extends PanelProvider
                 'Inventory',
                 'Transaksi',
                 'Laporan',
+                'Pengaturan',
             ]);
     }
 }

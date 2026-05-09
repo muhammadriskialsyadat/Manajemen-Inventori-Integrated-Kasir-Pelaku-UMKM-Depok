@@ -20,6 +20,11 @@ class CustomerResource extends Resource
 
     protected static ?string $navigationLabel = 'Pelanggan';
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->hasAnyRole(['Owner', 'Kasir', 'Akuntan']) ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form

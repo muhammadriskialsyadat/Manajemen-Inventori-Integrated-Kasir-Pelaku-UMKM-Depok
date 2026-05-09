@@ -14,7 +14,12 @@ class RecentStockMovementsWidget extends BaseWidget
 
     protected static ?string $heading = 'Aktivitas Stok Terbaru';
 
-    protected static ?int $sort = 3;
+    protected static ?int $sort = 6;
+
+    public static function canView(): bool
+    {
+        return auth()->user()?->hasRole('Owner') ?? false;
+    }
 
     public function table(Table $table): Table
     {

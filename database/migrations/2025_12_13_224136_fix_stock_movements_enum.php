@@ -12,16 +12,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Ubah enum reference_type untuk menambahkan 'sale_rollback'
-        DB::statement("ALTER TABLE stock_movements MODIFY COLUMN reference_type ENUM('purchase', 'sale', 'adjustment', 'sale_rollback') NOT NULL");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE stock_movements MODIFY COLUMN reference_type ENUM('purchase', 'sale', 'adjustment', 'sale_rollback') NOT NULL");
+        }
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
-        // Kembalikan ke enum lama
-        DB::statement("ALTER TABLE stock_movements MODIFY COLUMN reference_type ENUM('purchase', 'sale', 'adjustment') NOT NULL");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE stock_movements MODIFY COLUMN reference_type ENUM('purchase', 'sale', 'adjustment') NOT NULL");
+        }
     }
 };

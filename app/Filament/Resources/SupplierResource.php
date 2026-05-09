@@ -20,6 +20,11 @@ class SupplierResource extends Resource
 
     protected static ?string $navigationLabel = 'Supplier';
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->hasAnyRole(['Owner', 'Gudang', 'Akuntan']) ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form

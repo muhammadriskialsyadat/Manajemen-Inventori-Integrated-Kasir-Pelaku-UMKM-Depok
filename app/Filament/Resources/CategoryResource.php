@@ -20,6 +20,11 @@ class CategoryResource extends Resource
 
     protected static ?string $navigationLabel = 'Kategori';
 
+    public static function canAccess(): bool
+    {
+        return auth()->user()?->hasAnyRole(['Owner', 'Gudang', 'Akuntan']) ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form

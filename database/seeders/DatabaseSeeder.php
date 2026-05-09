@@ -3,8 +3,6 @@
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Hash;
-use App\Models\User;
 use App\Models\Category;
 use App\Models\Supplier;
 use App\Models\Customer;
@@ -17,14 +15,8 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1. CREATE ADMIN USER
-        User::create([
-            'name' => 'Admin',
-            'email' => 'admin@waroeng.com',
-            'password' => Hash::make('password'),
-            'role' => 'admin',
-            'is_active' => true,
-        ]);
+        // 1. ROLES & USERS (Spatie Permission)
+        $this->call(RoleAndPermissionSeeder::class);
 
         // 2. CREATE CATEGORIES DULU (PENTING!)
         $categories = [
@@ -249,8 +241,6 @@ class DatabaseSeeder extends Seeder
             );
         }
 
-        $this->command->info('✅ Database seeding completed successfully!');
-        $this->command->info('📧 Login: admin@waroeng.com');
-        $this->command->info('🔑 Password: password');
+        $this->command->info('✅ Master data seeding completed successfully!');
     }
 }

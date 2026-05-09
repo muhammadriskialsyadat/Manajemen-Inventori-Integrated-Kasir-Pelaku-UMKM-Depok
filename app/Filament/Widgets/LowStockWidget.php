@@ -13,7 +13,12 @@ class LowStockWidget extends BaseWidget
 
     protected static ?string $heading = 'Produk dengan Stok Menipis';
 
-    protected static ?int $sort = 2;
+    protected static ?int $sort = 5;
+
+    public static function canView(): bool
+    {
+        return auth()->user()?->hasAnyRole(['Owner', 'Gudang']) ?? false;
+    }
 
     public function table(Table $table): Table
     {

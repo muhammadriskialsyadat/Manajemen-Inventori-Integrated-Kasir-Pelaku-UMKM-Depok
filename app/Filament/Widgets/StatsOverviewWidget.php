@@ -13,6 +13,11 @@ use App\Models\SalesOrder;
 
 class StatsOverviewWidget extends BaseWidget
 {
+    public static function canView(): bool
+    {
+        return false;
+    }
+
     protected function getStats(): array
     {
         $lowStockCount = Product::whereColumn('current_stock', '<=', 'minimum_stock')->count();
