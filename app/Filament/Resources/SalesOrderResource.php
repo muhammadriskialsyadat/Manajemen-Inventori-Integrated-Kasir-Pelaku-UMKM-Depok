@@ -31,6 +31,11 @@ class SalesOrderResource extends Resource
         return auth()->user()?->hasAnyRole(['Owner', 'Kasir', 'Akuntan']) ?? false;
     }
 
+    public static function canDeleteAny(): bool
+    {
+        return auth()->user()?->hasAnyRole(['Owner', 'Kasir']) ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -128,35 +133,27 @@ class SalesOrderResource extends Resource
                                     ->default(1)
                                     ->live(onBlur: true)
                                     ->afterStateUpdated(function ($state, callable $set, callable $get) {
-                                        $price = (int) str_replace('.', '', $get('unit_price') ?? 0);
-                                        $set('total_price', $state * $price);
+                                        $price = (float) ($get('unit_price') ?? 0);
+                                        $set('total_price', (int) $state * $price);
 
-                                        // HITUNG ULANG TOTAL PEMBAYARAN
                                         $items = $get('../../items') ?? [];
-
-                                        $total = collect($items)->sum(function ($item) {
-                                            return (int) ($item['total_price'] ?? 0);
-                                        });
-
+                                        $total = collect($items)->sum(fn($item) => (float) ($item['total_price'] ?? 0));
                                         $set('../../total_amount', $total);
                                     }),
 
                                 Forms\Components\TextInput::make('unit_price')
                                     ->label('Harga Jual')
-                                    ->numeric()
-                                    ->step(0.01)
                                     ->prefix('Rp')
                                     ->readOnly()
                                     ->dehydrated()
-                                    ->formatStateUsing(fn($state) => $state ? number_format($state, 0, ',', '.') : 0),
+                                    ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
 
                                 Forms\Components\TextInput::make('total_price')
                                     ->label('Subtotal Item')
-                                    ->numeric()
                                     ->prefix('Rp')
                                     ->readOnly()
                                     ->dehydrated()
-                                    ->formatStateUsing(fn($state) => $state ? number_format($state, 0, ',', '.') : 0),
+                                    ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
                             ])
                             ->columns(4)
                             ->itemLabel(fn(array $state): ?string => $state['product_id'] ? Product::find($state['product_id'])?->name : null)
@@ -173,11 +170,11 @@ class SalesOrderResource extends Resource
                     ->schema([
                         Forms\Components\TextInput::make('total_amount')
                             ->label('Total Pembayaran')
-                            ->numeric()
                             ->prefix('Rp')
                             ->default(0)
                             ->readOnly()
-                            ->dehydrated(true), // <-- PERBAIKAN: TAMBAHKAN TRUE
+                            ->dehydrated(true)
+                            ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
                     ]),
             ])
             ->columns(2);
@@ -201,7 +198,7 @@ class SalesOrderResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('total_amount')
                     ->label('Total')
-                    ->formatStateUsing(fn($state) => 'Rp ' . number_format($state, 0, ',', '.'))
+                    ->money('IDR', locale: 'id')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->label('Status')

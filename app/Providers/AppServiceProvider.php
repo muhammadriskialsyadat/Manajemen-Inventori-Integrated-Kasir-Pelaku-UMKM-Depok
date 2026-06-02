@@ -11,6 +11,8 @@ use App\Models\PurchaseOrder;
 use App\Models\SalesOrder;
 use App\Models\StockMovement;
 use App\Models\Supplier;
+use App\Observers\PurchaseOrderObserver;
+use App\Observers\SalesOrderObserver;
 use App\Policies\CategoryPolicy;
 use App\Policies\CustomerPolicy;
 use App\Policies\ProductPolicy;
@@ -18,12 +20,13 @@ use App\Policies\PurchaseOrderPolicy;
 use App\Policies\SalesOrderPolicy;
 use App\Policies\StockMovementPolicy;
 use App\Policies\SupplierPolicy;
+use App\Services\FonnteService;
 
 class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->singleton(FonnteService::class);
     }
 
     public function boot(): void
@@ -35,5 +38,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(PurchaseOrder::class, PurchaseOrderPolicy::class);
         Gate::policy(SalesOrder::class,    SalesOrderPolicy::class);
         Gate::policy(StockMovement::class, StockMovementPolicy::class);
+
+        SalesOrder::observe(SalesOrderObserver::class);
+        PurchaseOrder::observe(PurchaseOrderObserver::class);
     }
 }

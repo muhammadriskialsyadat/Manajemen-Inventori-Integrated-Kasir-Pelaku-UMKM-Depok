@@ -30,7 +30,7 @@ class ReportPage extends Page implements HasForms
 
     public static function canAccess(): bool
     {
-        return auth()->user()?->hasAnyRole(['Owner', 'Akuntan']) ?? false;
+        return auth()->user()?->hasAnyRole(['Owner', 'Akuntan', 'Gudang', 'Kasir']) ?? false;
     }
 
     public ?array $data = [];
@@ -39,10 +39,15 @@ class ReportPage extends Page implements HasForms
 
     public function mount(): void
     {
+        $defaultType = match (true) {
+            auth()->user()?->hasRole('Kasir') => 'sales',
+            default => 'stock',
+        };
+
         $this->form->fill([
             'start_date' => now()->startOfMonth(),
             'end_date' => now()->endOfMonth(),
-            'report_type' => 'stock',
+            'report_type' => $defaultType,
         ]);
     }
 
@@ -52,16 +57,27 @@ class ReportPage extends Page implements HasForms
             ->schema([
                 Select::make('report_type')
                     ->label('Jenis Laporan')
-                    ->options([
-                        'stock' => 'Laporan Stok',
-                        'purchase' => 'Laporan Pembelian',
-                        'sales' => 'Laporan Penjualan',
-                        'stock_movement' => 'Laporan Pergerakan Stok',
-                    ])
+                    ->options(function () {
+                        $user = auth()->user();
+                        $all = [
+                            'stock'          => 'Laporan Stok',
+                            'purchase'       => 'Laporan Pembelian',
+                            'sales'          => 'Laporan Penjualan',
+                            'stock_movement' => 'Laporan Pergerakan Stok',
+                        ];
+
+                        if ($user?->hasRole('Gudang')) {
+                            return ['stock' => 'Laporan Stok', 'stock_movement' => 'Laporan Pergerakan Stok'];
+                        }
+                        if ($user?->hasRole('Kasir')) {
+                            return ['sales' => 'Laporan Penjualan'];
+                        }
+                        return $all;
+                    })
                     ->required()
-                    ->live() // Add live updating
+                    ->live()
                     ->afterStateUpdated(function () {
-                        $this->reportData = null; // Reset report data when type changes
+                        $this->reportData = null;
                     }),
                 DatePicker::make('start_date')
                     ->label('Tanggal Mulai')
@@ -86,13 +102,6 @@ class ReportPage extends Page implements HasForms
     {
         $data = $this->form->getState();
         
-        // Debug logging
-        Log::info('Generating report', [
-            'type' => $data['report_type'],
-            'start_date' => $data['start_date'],
-            'end_date' => $data['end_date']
-        ]);
-        
         try {
             $this->reportData = match ($data['report_type']) {
                 'stock' => $this->generateStockReport(),
@@ -101,12 +110,6 @@ class ReportPage extends Page implements HasForms
                 'stock_movement' => $this->generateStockMovementReport($data['start_date'], $data['end_date']),
                 default => null,
             };
-
-            // Debug hasil
-            Log::info('Report generated', [
-                'type' => $data['report_type'],
-                'data_count' => $this->getDataCount($this->reportData)
-            ]);
 
             // Show notification
             if ($this->reportData) {
@@ -162,12 +165,6 @@ class ReportPage extends Page implements HasForms
         $lowStockProducts = $products->filter(fn($product) => $product->current_stock <= $product->minimum_stock);
         $outOfStockProducts = $products->filter(fn($product) => $product->current_stock <= 0);
 
-        Log::info('Stock report generated', [
-            'total_products' => $products->count(),
-            'low_stock' => $lowStockProducts->count(),
-            'out_of_stock' => $outOfStockProducts->count()
-        ]);
-
         return [
             'type' => 'stock',
             'products' => $products,
@@ -183,11 +180,6 @@ class ReportPage extends Page implements HasForms
         // Convert strings to Carbon instances - use DATE ONLY for purchase_date comparison
         $start = Carbon::parse($startDate)->format('Y-m-d');
         $end = Carbon::parse($endDate)->format('Y-m-d');
-        
-        Log::info('Purchase report query', [
-            'start_date' => $start,
-            'end_date' => $end
-        ]);
 
         $purchases = PurchaseOrder::with(['supplier', 'items.product'])
             ->whereDate('purchase_date', '>=', $start)
@@ -195,11 +187,6 @@ class ReportPage extends Page implements HasForms
             ->where('status', 'completed')
             ->orderBy('purchase_date', 'desc')
             ->get();
-
-        Log::info('Purchase report result', [
-            'total_purchases' => $purchases->count(),
-            'total_amount' => $purchases->sum('total_amount')
-        ]);
 
         return [
             'type' => 'purchase',
@@ -215,11 +202,6 @@ class ReportPage extends Page implements HasForms
         // Convert strings to Carbon instances - use DATE ONLY for sale_date comparison
         $start = Carbon::parse($startDate)->format('Y-m-d');
         $end = Carbon::parse($endDate)->format('Y-m-d');
-        
-        Log::info('Sales report query', [
-            'start_date' => $start,
-            'end_date' => $end
-        ]);
 
         $sales = SalesOrder::with(['customer', 'items.product'])
             ->whereDate('sale_date', '>=', $start)
@@ -227,17 +209,6 @@ class ReportPage extends Page implements HasForms
             ->where('status', 'completed')
             ->orderBy('sale_date', 'desc')
             ->get();
-
-        Log::info('Sales report result', [
-            'total_sales' => $sales->count(),
-            'total_amount' => $sales->sum('total_amount'),
-            'sales_data' => $sales->map(fn($s) => [
-                'so_number' => $s->so_number,
-                'customer' => $s->customer->name ?? 'N/A',
-                'date' => $s->sale_date->format('Y-m-d'),
-                'amount' => $s->total_amount
-            ])
-        ]);
 
         return [
             'type' => 'sales',
@@ -253,30 +224,12 @@ class ReportPage extends Page implements HasForms
         // Convert strings to Carbon instances - use DATETIME for created_at comparison
         $start = Carbon::parse($startDate)->startOfDay();
         $end = Carbon::parse($endDate)->endOfDay();
-        
-        Log::info('Stock movement report query', [
-            'start_date' => $start->format('Y-m-d H:i:s'),
-            'end_date' => $end->format('Y-m-d H:i:s')
-        ]);
 
         $movements = StockMovement::with('product')
             ->where('created_at', '>=', $start)
             ->where('created_at', '<=', $end)
             ->orderBy('created_at', 'desc')
             ->get();
-
-        Log::info('Stock movement report result', [
-            'total_movements' => $movements->count(),
-            'total_in' => $movements->where('type', 'in')->sum('quantity'),
-            'total_out' => $movements->where('type', 'out')->sum('quantity'),
-            'movements_sample' => $movements->take(3)->map(fn($m) => [
-                'id' => $m->id,
-                'product' => $m->product->name ?? 'N/A',
-                'type' => $m->type,
-                'quantity' => $m->quantity,
-                'created_at' => $m->created_at->format('Y-m-d H:i:s')
-            ])
-        ]);
 
         return [
             'type' => 'stock_movement',

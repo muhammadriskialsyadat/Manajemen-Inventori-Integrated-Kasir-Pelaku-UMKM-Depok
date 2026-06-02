@@ -29,6 +29,11 @@ class PurchaseOrderResource extends Resource
         return auth()->user()?->hasAnyRole(['Owner', 'Gudang', 'Akuntan']) ?? false;
     }
 
+    public static function canDeleteAny(): bool
+    {
+        return auth()->user()?->hasAnyRole(['Owner', 'Gudang']) ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -105,7 +110,7 @@ class PurchaseOrderResource extends Resource
                                         }
 
                                         $product = \App\Models\Product::find($state);
-                                        $unitPrice = $product?->purchase_price ?? 0;
+                                        $unitPrice = (float) ($product?->purchase_price ?? 0);
 
                                         $set('unit_price', $unitPrice);
                                         $set('quantity', 1);
@@ -134,19 +139,17 @@ class PurchaseOrderResource extends Resource
 
                                 Forms\Components\TextInput::make('unit_price')
                                     ->label('Harga Satuan')
-                                    ->numeric()
                                     ->prefix('Rp')
                                     ->readOnly()
                                     ->dehydrated()
-                                    ->formatStateUsing(fn($state) => number_format($state ?? 0, 0, ',', '.')),
+                                    ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
 
                                 Forms\Components\TextInput::make('total_price')
                                     ->label('Subtotal Item')
-                                    ->numeric()
                                     ->prefix('Rp')
                                     ->readOnly()
                                     ->dehydrated()
-                                    ->formatStateUsing(fn($state) => number_format($state ?? 0, 0, ',', '.')),
+                                    ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
                             ])
 
                             ->columns(4)
@@ -180,12 +183,11 @@ class PurchaseOrderResource extends Resource
 
                         Forms\Components\TextInput::make('discount_amount')
                             ->label('Jumlah Diskon')
-                            ->numeric()
                             ->prefix('Rp')
                             ->default(0)
                             ->readOnly()
                             ->dehydrated()
-                            ->formatStateUsing(fn($state) => number_format($state ?? 0, 0, ',', '.')),
+                            ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
 
                         Forms\Components\Select::make('tax_percentage')
                             ->label('Pajak')
@@ -203,33 +205,30 @@ class PurchaseOrderResource extends Resource
 
                         Forms\Components\TextInput::make('tax_amount')
                             ->label('Jumlah Pajak')
-                            ->numeric()
                             ->prefix('Rp')
                             ->default(0)
                             ->readOnly()
                             ->dehydrated()
-                            ->formatStateUsing(fn($state) => number_format($state ?? 0, 0, ',', '.')),
+                            ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
                     ])->columns(2),
 
                 Forms\Components\Section::make('Total Pembelian')
                     ->schema([
                         Forms\Components\TextInput::make('subtotal')
                             ->label('Subtotal')
-                            ->numeric()
                             ->prefix('Rp')
                             ->default(0)
                             ->readOnly()
                             ->dehydrated(true)
-                            ->formatStateUsing(fn($state) => number_format($state ?? 0, 0, ',', '.')),
+                            ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
 
                         Forms\Components\TextInput::make('grand_total')
                             ->label('Grand Total')
-                            ->numeric()
                             ->prefix('Rp')
                             ->default(0)
                             ->readOnly()
                             ->dehydrated(true)
-                            ->formatStateUsing(fn($state) => number_format($state ?? 0, 0, ',', '.')),
+                            ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
                     ])->columns(2),
             ])
             ->columns(2);
@@ -240,10 +239,7 @@ class PurchaseOrderResource extends Resource
     {
         $items = collect($items ?? []);
 
-        $subtotal = $items->sum(function ($item) {
-            $raw = $item['total_price'] ?? 0;
-            return (float) str_replace('.', '', $raw);
-        });
+        $subtotal = $items->sum(fn($item) => (float) ($item['total_price'] ?? 0));
 
         $set('subtotal', $subtotal);
 
@@ -293,7 +289,7 @@ class PurchaseOrderResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('subtotal')
                     ->label('Subtotal')
-                    ->money('IDR')
+                    ->money('IDR', locale: 'id')
                     ->sortable()
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('tax_percentage')
@@ -303,7 +299,7 @@ class PurchaseOrderResource extends Resource
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('total_amount')
                     ->label('Grand Total')
-                    ->money('IDR')
+                    ->money('IDR', locale: 'id')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->label('Status')

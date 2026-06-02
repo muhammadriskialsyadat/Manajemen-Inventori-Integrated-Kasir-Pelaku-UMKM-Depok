@@ -25,6 +25,11 @@ class SupplierResource extends Resource
         return auth()->user()?->hasAnyRole(['Owner', 'Gudang', 'Akuntan']) ?? false;
     }
 
+    public static function canDeleteAny(): bool
+    {
+        return auth()->user()?->hasAnyRole(['Owner', 'Gudang']) ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form

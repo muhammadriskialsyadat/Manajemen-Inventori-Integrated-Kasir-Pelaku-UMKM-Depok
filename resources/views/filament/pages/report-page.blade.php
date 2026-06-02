@@ -65,15 +65,30 @@
             margin-top: 1.5rem !important;
         }
 
-        /* Export button container */
-        .export-container {
-            margin-top: 1rem !important;
-            padding-top: 2rem !important;
-            border-top: 1px solid #e5e7eb !important;
+        /* Sticky export bar */
+        .export-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 50;
+            background: #ffffff;
+            border-top: 1px solid #e5e7eb;
+            padding: 0.875rem 2rem;
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            box-shadow: 0 -4px 12px rgba(0,0,0,0.08);
         }
 
-        .dark .export-container {
-            border-top-color: #374151 !important;
+        .dark .export-bar {
+            background: #1f2937;
+            border-top-color: #374151;
+        }
+
+        /* Push content so last rows aren't hidden behind bar */
+        .report-content-wrap {
+            padding-bottom: 80px;
         }
 
         /* Export buttons styling - FIX untuk light dan dark theme */
@@ -148,7 +163,7 @@
         }
     </style>
 
-    <div class="space-y-6">
+    <div class="space-y-6 report-content-wrap">
         <!-- Form Section -->
         <div class="form-spacing">
             <form wire:submit="generateReport" class="no-print">
@@ -269,7 +284,7 @@
                             @foreach($this->reportData['sales'] as $sale)
                             <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
                                 <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{{ $sale->so_number }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{{ $sale->customer->name }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{{ $sale->customer?->name ?? 'N/A' }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{{ $sale->sale_date->format('d/m/Y') }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">Rp {{ number_format($sale->total_amount, 0, ',', '.') }}</td>
                             </tr>
@@ -321,7 +336,7 @@
                             @foreach($this->reportData['purchases'] as $purchase)
                             <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
                                 <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{{ $purchase->po_number }}</td>
-                                <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{{ $purchase->supplier->name }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{{ $purchase->supplier?->name ?? 'N/A' }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{{ $purchase->purchase_date->format('d/m/Y') }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">Rp {{ number_format($purchase->total_amount, 0, ',', '.') }}</td>
                             </tr>
@@ -402,79 +417,58 @@
             </div>
             @endif
 
-            <!-- Export Buttons -->
-            <div class="flex justify-center gap-6 export-container no-print">
-                <button onclick="exportToPDF()" class="export-button export-pdf">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-                    </svg>
-                    <span>Export PDF</span>
-                </button>
-                <button onclick="exportToExcel()" class="export-button export-excel">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <span>Export Excel</span>
-                </button>
-            </div>
         </div>
         @endif
     </div>
 
+    {{-- Sticky export bar — only visible after report is generated --}}
+    @if($this->reportData)
+    <div class="export-bar no-print">
+        <button onclick="exportToPDF()" class="export-button export-pdf">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+            </svg>
+            <span>Export PDF</span>
+        </button>
+        <button onclick="exportToExcel()" class="export-button export-excel">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span>Export Excel</span>
+        </button>
+    </div>
+    @endif
+
     <script>
-        function exportToPDF() {
+        function buildExportForm(action, target) {
             const form = document.createElement('form');
             form.method = 'POST';
-            form.action = '{{ route("reports.export.pdf") }}';
-            form.target = '_blank';
+            form.action = action;
+            if (target) form.target = target;
 
-            // Add CSRF token
-            const csrfToken = document.createElement('input');
-            csrfToken.type = 'hidden';
-            csrfToken.name = '_token';
-            csrfToken.value = '{{ csrf_token() }}';
-            form.appendChild(csrfToken);
-
-            // Add form data
-            const formData = @this.data;
-            Object.keys(formData).forEach(key => {
+            const addField = (name, value) => {
                 const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = key;
-                input.value = formData[key];
+                input.type  = 'hidden';
+                input.name  = name;
+                input.value = value ?? '';
                 form.appendChild(input);
-            });
+            };
+
+            addField('_token', '{{ csrf_token() }}');
+
+            // Read each field explicitly from Livewire to avoid proxy enumeration issues
+            const wireData = @this.data;
+            addField('report_type', wireData.report_type);
+            addField('start_date',  wireData.start_date);
+            addField('end_date',    wireData.end_date);
 
             document.body.appendChild(form);
             form.submit();
-            document.body.removeChild(form);
+            // Remove after a tick to ensure submit is queued
+            setTimeout(() => document.body.removeChild(form), 100);
         }
 
-        function exportToExcel() {
-            const form = document.createElement('form');
-            form.method = 'POST';
-            form.action = '{{ route("reports.export.excel") }}';
-
-            // Add CSRF token
-            const csrfToken = document.createElement('input');
-            csrfToken.type = 'hidden';
-            csrfToken.name = '_token';
-            csrfToken.value = '{{ csrf_token() }}';
-            form.appendChild(csrfToken);
-
-            // Add form data
-            const formData = @this.data;
-            Object.keys(formData).forEach(key => {
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = key;
-                input.value = formData[key];
-                form.appendChild(input);
-            });
-
-            document.body.appendChild(form);
-            form.submit();
-            document.body.removeChild(form);
-        }
+        function exportToPDF()   { buildExportForm('{{ route("reports.export.pdf") }}',   '_blank'); }
+        function exportToExcel() { buildExportForm('{{ route("reports.export.excel") }}',  null); }
     </script>
 </x-filament-panels::page>

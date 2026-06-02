@@ -24,12 +24,24 @@ class StockMovementResource extends Resource
 
     protected static ?string $navigationLabel = 'Pergerakan Stok';
 
-    // ✅ TAMBAHKAN INI: Polling otomatis setiap 10 detik
-    protected static ?string $pollingInterval = '10s';
-
     public static function canAccess(): bool
     {
         return auth()->user()?->hasAnyRole(['Owner', 'Gudang', 'Kasir', 'Akuntan']) ?? false;
+    }
+
+    public static function canCreate(): bool
+    {
+        return auth()->user()?->hasAnyRole(['Owner', 'Gudang']) ?? false;
+    }
+
+    public static function canEdit($record): bool
+    {
+        return auth()->user()?->hasAnyRole(['Owner', 'Gudang']) ?? false;
+    }
+
+    public static function canDelete($record): bool
+    {
+        return auth()->user()?->hasRole('Owner') ?? false;
     }
 
     public static function form(Form $form): Form

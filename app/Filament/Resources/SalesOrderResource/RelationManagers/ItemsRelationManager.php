@@ -1,5 +1,4 @@
 <?php
-// app/Filament/Resources/SalesOrderResource/RelationManagers/ItemsRelationManager.php
 
 namespace App\Filament\Resources\SalesOrderResource\RelationManagers;
 
@@ -8,10 +7,8 @@ use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Model;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class ItemsRelationManager extends RelationManager
 {
@@ -22,6 +19,7 @@ class ItemsRelationManager extends RelationManager
     {
         return false;
     }
+
     public function form(Form $form): Form
     {
         return $form
@@ -35,42 +33,47 @@ class ItemsRelationManager extends RelationManager
                     ->reactive()
                     ->afterStateUpdated(function ($state, callable $set) {
                         if ($state) {
-                            $product = \App\Models\Product::find($state);
-                            $set('unit_price', $product->selling_price ?? 0);
+                            $product   = \App\Models\Product::find($state);
+                            $unitPrice = (float) ($product?->selling_price ?? 0);
+                            $set('unit_price', $unitPrice);
                             $set('quantity', 1);
-                            $set('total_price', $product->selling_price ?? 0);
+                            $set('total_price', $unitPrice);
                         }
                     })
                     ->getOptionLabelFromRecordUsing(fn($record) => "{$record->name} (Stok: {$record->current_stock})"),
+
                 Forms\Components\TextInput::make('quantity')
                     ->label('Jumlah')
                     ->numeric()
                     ->required()
                     ->minValue(1)
                     ->default(1)
-                    ->reactive()
+                    ->live(onBlur: true)
                     ->afterStateUpdated(function ($state, callable $get, callable $set) {
-                        $quantity = (int) $state;
-                        $unitPrice = (float) $get('unit_price');
+                        $quantity  = (int) $state;
+                        $unitPrice = (float) ($get('unit_price') ?? 0);
                         $set('total_price', $quantity * $unitPrice);
                     }),
+
                 Forms\Components\TextInput::make('unit_price')
                     ->label('Harga Satuan')
                     ->numeric()
+                    ->inputMode('decimal')
                     ->required()
                     ->prefix('Rp')
-                    ->reactive()
+                    ->live(onBlur: true)
                     ->afterStateUpdated(function ($state, callable $get, callable $set) {
-                        $quantity = (int) $get('quantity');
+                        $quantity  = (int) ($get('quantity') ?? 1);
                         $unitPrice = (float) $state;
                         $set('total_price', $quantity * $unitPrice);
                     }),
+
                 Forms\Components\TextInput::make('total_price')
                     ->label('Total Harga')
-                    ->numeric()
                     ->prefix('Rp')
                     ->disabled()
-                    ->dehydrated(),
+                    ->dehydrated()
+                    ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
             ]);
     }
 
@@ -93,10 +96,10 @@ class ItemsRelationManager extends RelationManager
                     ->numeric(),
                 Tables\Columns\TextColumn::make('unit_price')
                     ->label('Harga Satuan')
-                    ->money('IDR'),
+                    ->money('IDR', locale: 'id'),
                 Tables\Columns\TextColumn::make('total_price')
                     ->label('Total')
-                    ->money('IDR'),
+                    ->money('IDR', locale: 'id'),
             ])
             ->headerActions([
                 Tables\Actions\CreateAction::make()
@@ -128,10 +131,7 @@ class ItemsRelationManager extends RelationManager
             ->actions([
                 Tables\Actions\EditAction::make()
                     ->mutateRecordDataUsing(function (array $data, $record): array {
-                        // Simpan old quantity SEBELUM form dibuka
                         cache()->put("edit_so_item_{$record->id}_old_qty", $record->quantity, 300);
-                        Log::info("=== SO ITEM EDIT FORM OPENED ===");
-                        Log::info("Item ID: {$record->id}, Saved Old Qty: {$record->quantity}");
                         return $data;
                     })
                     ->before(function ($record, $data) {
@@ -140,10 +140,7 @@ class ItemsRelationManager extends RelationManager
                         if ($so->status === 'completed') {
                             $oldQty = cache()->get("edit_so_item_{$record->id}_old_qty", $record->quantity);
                             $newQty = $data['quantity'];
-                            $diff = $newQty - $oldQty;
-
-                            Log::info("=== SO ITEM VALIDATION ===");
-                            Log::info("Old Qty: {$oldQty}, New Qty: {$newQty}, Diff: {$diff}");
+                            $diff   = $newQty - $oldQty;
 
                             if ($diff > 0) {
                                 $product = $record->product;
@@ -161,17 +158,12 @@ class ItemsRelationManager extends RelationManager
                     })
                     ->after(function ($record) {
                         $so = $this->getOwnerRecord();
-
-                        Log::info("=== SO ITEM AFTER SAVE ===");
-                        Log::info("Item ID: {$record->id}, New Qty: {$record->quantity}");
-
                         $so->calculateTotal();
 
                         if ($so->status === 'completed') {
                             $oldQty = cache()->get("edit_so_item_{$record->id}_old_qty");
 
                             if ($oldQty === null) {
-                                Log::error("Old quantity not found in cache!");
                                 Notification::make()
                                     ->title('Error')
                                     ->body('Gagal mengambil data quantity lama. Silakan refresh halaman.')
@@ -181,19 +173,16 @@ class ItemsRelationManager extends RelationManager
                             }
 
                             $newQty = $record->quantity;
-                            $diff = $newQty - $oldQty;
-
-                            Log::info("Processing stock update: Old={$oldQty}, New={$newQty}, Diff={$diff}");
+                            $diff   = $newQty - $oldQty;
 
                             if ($diff != 0) {
                                 $this->updateStockForEditedItem($record, $diff, $oldQty, $newQty);
-                            } else {
-                                Log::info("No quantity change detected");
                             }
 
                             cache()->forget("edit_so_item_{$record->id}_old_qty");
                         }
                     }),
+
                 Tables\Actions\DeleteAction::make()
                     ->before(function ($record) {
                         $so = $this->getOwnerRecord();
@@ -203,60 +192,48 @@ class ItemsRelationManager extends RelationManager
                         }
                     })
                     ->after(function () {
-                        $so = $this->getOwnerRecord();
-                        $so->calculateTotal();
+                        $this->getOwnerRecord()->calculateTotal();
                     }),
             ]);
     }
 
-    protected function updateStockForEditedItem($item, $diff, $oldQty, $newQty): void
+    protected function updateStockForEditedItem($item, int $diff, int $oldQty, int $newQty): void
     {
         DB::transaction(function () use ($item, $diff, $oldQty, $newQty) {
-            $product = $item->product()->lockForUpdate()->first();
+            $product       = $item->product()->lockForUpdate()->first();
             $previousStock = $product->current_stock;
-
-            Log::info("=== STOCK UPDATE START ===");
-            Log::info("Product: {$product->name} (ID: {$product->id})");
-            Log::info("Previous Stock: {$previousStock}");
-            Log::info("Qty Change: {$oldQty} → {$newQty} (diff: {$diff})");
 
             if ($diff > 0) {
                 // Qty bertambah = stok berkurang
                 $newStock = $previousStock - abs($diff);
-                $type = 'out';
-                $notes = "Edit SO item (qty {$oldQty}→{$newQty}) - SO: {$item->salesOrder->so_number}";
+                $type     = 'out';
             } else {
                 // Qty berkurang = stok bertambah
                 $newStock = $previousStock + abs($diff);
-                $type = 'in';
-                $notes = "Edit SO item (qty {$oldQty}→{$newQty}) - SO: {$item->salesOrder->so_number}";
+                $type     = 'in';
             }
+
+            $notes = "Edit SO item (qty {$oldQty}→{$newQty}) - SO: {$item->salesOrder->so_number}";
 
             $product->current_stock = $newStock;
             $product->save();
 
-            Log::info("New Stock: {$newStock}");
-
-            $movement = \App\Models\StockMovement::create([
-                'product_id' => $product->id,
-                'user_id' => auth()->id() ?? 1,
-                'type' => $type,
+            \App\Models\StockMovement::create([
+                'product_id'     => $product->getKey(),
+                'user_id'        => auth()->id() ?? 1,
+                'type'           => $type,
                 'reference_type' => 'sale',
-                'reference_id' => $item->sales_order_id,
-                'quantity' => abs($diff),
+                'reference_id'   => $item->sales_order_id,
+                'quantity'       => abs($diff),
                 'previous_stock' => $previousStock,
-                'current_stock' => $newStock,
-                'notes' => $notes,
+                'current_stock'  => $newStock,
+                'notes'          => $notes,
             ]);
 
-            Log::info("Stock Movement Created: ID={$movement->id}, Type={$type}, Qty=" . abs($diff));
-            Log::info("=== STOCK UPDATE END ===");
-
             Notification::make()
-                ->title('✅ Stock Updated!')
+                ->title('Stok diperbarui')
                 ->body("{$product->name}: {$previousStock} → {$newStock}")
                 ->success()
-                ->duration(5000)
                 ->send();
         });
     }

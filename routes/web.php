@@ -13,5 +13,7 @@ Route::get('/purchase-order/{purchaseOrder}/invoice', function (PurchaseOrder $p
     return view('filament.pages.purchase-invoice', compact('purchaseOrder'));
 })->name('purchase-order.invoice')->middleware('auth');
 
-Route::post('/reports/export/pdf', [ReportExportController::class, 'exportPdf'])->name('reports.export.pdf');
-Route::post('/reports/export/excel', [ReportExportController::class, 'exportExcel'])->name('reports.export.excel');
+Route::middleware('auth')->group(function () {
+    Route::post('/reports/export/pdf', [ReportExportController::class, 'exportPdf'])->name('reports.export.pdf');
+    Route::post('/reports/export/excel', [ReportExportController::class, 'exportExcel'])->name('reports.export.excel');
+});

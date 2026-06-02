@@ -27,6 +27,11 @@ class ProductResource extends Resource
         return auth()->user()?->hasAnyRole(['Owner', 'Gudang', 'Kasir', 'Akuntan']) ?? false;
     }
 
+    public static function canDeleteAny(): bool
+    {
+        return auth()->user()?->hasAnyRole(['Owner', 'Gudang']) ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -85,12 +90,14 @@ class ProductResource extends Resource
                         Forms\Components\TextInput::make('purchase_price')
                             ->label('Harga Beli')
                             ->numeric()
+                            ->inputMode('decimal')
                             ->prefix('Rp')
                             ->default(0)
                             ->minValue(0),
                         Forms\Components\TextInput::make('selling_price')
                             ->label('Harga Jual')
                             ->numeric()
+                            ->inputMode('decimal')
                             ->prefix('Rp')
                             ->default(0)
                             ->minValue(0),
@@ -160,13 +167,14 @@ class ProductResource extends Resource
                     }),
                 Tables\Columns\TextColumn::make('purchase_price')
                     ->label('Harga Beli')
-                    ->money('IDR')
+                    ->money('IDR', locale: 'id')
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('selling_price')
                     ->label('Harga Jual')
-                    ->money('IDR')
+                    ->money('IDR', locale: 'id')
                     ->toggleable(),
             ])
+            ->defaultSort('created_at', 'desc')
             ->filters([
                 Tables\Filters\SelectFilter::make('category_id')
                     ->label('Kategori')

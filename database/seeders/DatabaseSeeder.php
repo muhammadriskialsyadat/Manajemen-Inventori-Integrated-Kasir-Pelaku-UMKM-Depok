@@ -18,6 +18,9 @@ class DatabaseSeeder extends Seeder
         // 1. ROLES & USERS (Spatie Permission)
         $this->call(RoleAndPermissionSeeder::class);
 
+        // 2. APP SETTINGS — default notification toggles
+        $this->call(AppSettingSeeder::class);
+
         // 2. CREATE CATEGORIES DULU (PENTING!)
         $categories = [
             ['name' => 'Cat Tembok', 'description' => 'Cat untuk interior dan eksterior tembok'],

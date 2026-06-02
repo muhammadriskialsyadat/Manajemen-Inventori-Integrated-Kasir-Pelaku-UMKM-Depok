@@ -25,6 +25,11 @@ class CustomerResource extends Resource
         return auth()->user()?->hasAnyRole(['Owner', 'Kasir', 'Akuntan']) ?? false;
     }
 
+    public static function canDeleteAny(): bool
+    {
+        return auth()->user()?->hasAnyRole(['Owner', 'Kasir']) ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form

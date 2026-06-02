@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use App\Models\Product;
 use App\Models\SalesOrder;
 use App\Models\PurchaseOrder;
@@ -22,54 +21,81 @@ class ReportExportController extends Controller
 {
     public function exportPdf(Request $request)
     {
+        ini_set('memory_limit', '256M');
+
         $reportType = $request->input('report_type');
-        $startDate = $request->input('start_date');
-        $endDate = $request->input('end_date');
+        $startDate  = $request->input('start_date');
+        $endDate    = $request->input('end_date');
 
-        $reportData = $this->generateReportData($reportType, $startDate, $endDate);
+        try {
+            $reportData = $this->generateReportData($reportType, $startDate, $endDate);
 
-        // Configure DomPDF
-        $options = new Options();
-        $options->set('defaultFont', 'Arial');
-        $options->set('isRemoteEnabled', true);
+            $options = new Options();
+            $options->set('defaultFont', 'Arial');
+            $options->set('isRemoteEnabled', false);
 
-        $dompdf = new Dompdf($options);
+            $dompdf = new Dompdf($options);
 
-        // Generate HTML for PDF
-        $html = view('reports.pdf-template', [
-            'reportData' => $reportData,
-            'reportType' => $reportType,
-            'startDate' => $startDate,
-            'endDate' => $endDate
-        ])->render();
+            $html = view('reports.pdf-template', [
+                'reportData' => $reportData,
+                'reportType' => $reportType,
+                'startDate'  => $startDate,
+                'endDate'    => $endDate,
+            ])->render();
 
-        $dompdf->loadHtml($html);
-        $dompdf->setPaper('A4', 'portrait');
-        $dompdf->render();
+            $dompdf->loadHtml($html);
+            $dompdf->setPaper('A4', 'portrait');
+            $dompdf->render();
 
-        $filename = $this->getFilename($reportType, 'pdf');
+            $pdfOutput = $dompdf->output();
+            $filename  = $this->getFilename($reportType, 'pdf');
 
-        $pdfOutput = $dompdf->output();
+            \Illuminate\Support\Facades\Log::info('PDF export success', [
+                'report_type' => $reportType,
+                'pdf_size'    => strlen($pdfOutput),
+            ]);
 
-        return response($pdfOutput, 200)
-            ->header('Content-Type', 'application/pdf')
-            ->header('Content-Disposition', 'inline; filename="' . $filename . '"');
+            return response()->streamDownload(
+                fn () => print($pdfOutput),
+                $filename,
+                ['Content-Type' => 'application/pdf']
+            );
+
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('PDF export failed', [
+                'report_type' => $reportType,
+                'error'       => $e->getMessage(),
+                'trace'       => $e->getTraceAsString(),
+            ]);
+
+            return response('PDF export error: ' . $e->getMessage(), 500)
+                ->header('Content-Type', 'text/plain');
+        }
     }
 
     public function exportExcel(Request $request)
     {
         $reportType = $request->input('report_type');
-        $startDate = $request->input('start_date');
-        $endDate = $request->input('end_date');
+        $startDate  = $request->input('start_date');
+        $endDate    = $request->input('end_date');
 
-        $reportData = $this->generateReportData($reportType, $startDate, $endDate);
+        try {
+            $reportData = $this->generateReportData($reportType, $startDate, $endDate);
+            $filename   = $this->getFilename($reportType, 'xlsx');
 
-        $filename = $this->getFilename($reportType, 'xlsx');
+            return Excel::download(
+                new ReportExport($reportData, $reportType),
+                $filename
+            );
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Excel export failed', [
+                'report_type' => $reportType,
+                'error'       => $e->getMessage(),
+            ]);
 
-        return Excel::download(
-            new ReportExport($reportData, $reportType),
-            $filename
-        );
+            return response('Excel export error: ' . $e->getMessage(), 500)
+                ->header('Content-Type', 'text/plain');
+        }
     }
 
     private function generateReportData($reportType, $startDate, $endDate)
@@ -215,28 +241,28 @@ class ReportExport implements FromCollection, WithHeadings, WithMapping, WithSty
             'stock' => [
                 $row->code,
                 $row->name,
-                $row->category->name,
+                $row->category?->name ?? 'N/A',
                 $row->current_stock,
                 $row->minimum_stock,
                 $row->current_stock <= 0 ? 'Habis' : ($row->current_stock <= $row->minimum_stock ? 'Menipis' : 'Normal')
             ],
             'sales' => [
                 $row->so_number,
-                $row->customer->name,
+                $row->customer?->name ?? 'N/A',
                 $row->sale_date->format('d/m/Y'),
                 $row->total_amount,
                 ucfirst($row->status)
             ],
             'purchase' => [
                 $row->po_number,
-                $row->supplier->name,
+                $row->supplier?->name ?? 'N/A',
                 $row->purchase_date->format('d/m/Y'),
                 $row->total_amount,
                 ucfirst($row->status)
             ],
             'stock_movement' => [
                 $row->created_at->format('d/m/Y H:i'),
-                $row->product->name,
+                $row->product?->name ?? 'N/A',
                 $row->type === 'in' ? 'Masuk' : 'Keluar',
                 $row->quantity,
                 $row->previous_stock,

@@ -13,17 +13,10 @@ class CreateSalesOrder extends CreateRecord
     protected function afterCreate(): void
     {
         $record = $this->record;
-
-        Log::info("CreateSalesOrder afterCreate - SO ID: {$record->id}, Status: {$record->status}");
-
         $record->refresh();
         $record->load('items');
 
-        Log::info("Items count: " . $record->items->count());
-
         if ($record->status === 'completed' && $record->items->count() > 0) {
-            Log::info("SO created with completed status - updating stock via afterCreate()");
-
             try {
                 foreach ($record->items as $item) {
                     if ($item->product->current_stock < $item->quantity) {

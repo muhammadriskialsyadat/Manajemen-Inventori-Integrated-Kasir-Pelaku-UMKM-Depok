@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class SalesOrder extends Model
 {
@@ -31,37 +30,29 @@ class SalesOrder extends Model
     {
         parent::boot();
 
-        static::creating(function ($so) {
-            $so->total_amount = $so->total_amount ?? 0;
-            Log::info("SO Creating - Total Amount: {$so->total_amount}");
+        static::creating(function ($salesOrder) {
+            $salesOrder->total_amount ??= 0;
         });
 
-        static::created(function ($so) {
-            Log::info("SO Created - ID: {$so->id}, Total Amount saved: {$so->total_amount}, Status: {$so->status}");
-            // ✅ LOGIC DIPINDAH KE CreateSalesOrder::afterCreate()
-            // Karena di sini items belum ter-save
+        static::created(function () {
+            // Items belum ter-save saat created — stock update di CreateSalesOrder::afterCreate()
         });
 
         static::deleting(function ($salesOrder) {
             if ($salesOrder->status === 'completed') {
-                Log::info("SO Deleting - Rolling back stock for SO {$salesOrder->id}");
                 $salesOrder->rollbackProductStock();
             }
         });
 
         static::updating(function ($salesOrder) {
             $originalStatus = $salesOrder->getOriginal('status');
-            $newStatus = $salesOrder->status;
-
-            Log::info("SO Status Change: {$originalStatus} → {$newStatus}");
+            $newStatus      = $salesOrder->status;
 
             if ($originalStatus === 'completed' && $newStatus === 'cancelled') {
-                Log::info("Rolling back stock for SO {$salesOrder->id}");
                 $salesOrder->rollbackProductStock();
             }
 
             if (in_array($originalStatus, ['pending', 'cancelled']) && $newStatus === 'completed') {
-                Log::info("Updating stock for completed SO {$salesOrder->id}");
                 $salesOrder->updateProductStock();
             }
         });
@@ -81,20 +72,20 @@ class SalesOrder extends Model
     {
         $this->total_amount = $this->items->sum('total_price');
         $this->save();
-
-        Log::info("SO calculateTotal - Total Amount: {$this->total_amount}");
     }
 
     public function updateProductStock(): void
     {
         if ($this->status !== 'completed') {
-            Log::warning("Cannot update stock - SO status is {$this->status}");
             return;
         }
 
-        DB::transaction(function () {
+        $lowStockAlerts   = [];
+        $customerName     = $this->customer?->name ?? 'N/A';
+
+        DB::transaction(function () use (&$lowStockAlerts, $customerName) {
             foreach ($this->items as $item) {
-                $product = $item->product;
+                $product       = $item->product;
                 $previousStock = $product->current_stock;
 
                 if ($product->current_stock < $item->quantity) {
@@ -106,20 +97,48 @@ class SalesOrder extends Model
                 $currentStock = $product->fresh()->current_stock;
 
                 \App\Models\StockMovement::create([
-                    'product_id' => $product->id,
-                    'user_id' => auth()->id() ?? 1,
-                    'type' => 'out',
+                    'product_id'     => $product->getKey(),
+                    'user_id'        => auth()->id() ?? 1,
+                    'type'           => 'out',
                     'reference_type' => 'sale',
-                    'reference_id' => $this->id,
-                    'quantity' => $item->quantity,
+                    'reference_id'   => $this->getKey(),
+                    'quantity'       => $item->quantity,
                     'previous_stock' => $previousStock,
-                    'current_stock' => $currentStock,
-                    'notes' => "Penjualan ke {$this->customer->name} - SO: {$this->so_number} - Produk: {$product->name}",
+                    'current_stock'  => $currentStock,
+                    'notes'          => "Penjualan ke {$customerName} - SO: {$this->so_number} - Produk: {$product->name}",
                 ]);
 
-                Log::info("Stock updated for Product {$product->id}: {$previousStock} → {$currentStock} (-{$item->quantity})");
+                if ($currentStock <= $product->minimum_stock) {
+                    $lowStockAlerts[] = ['product' => $product->fresh(), 'stock' => $currentStock];
+                }
             }
         });
+
+        // Send low-stock alerts after transaction commits (Trigger 1)
+        foreach ($lowStockAlerts as $alert) {
+            $this->sendLowStockNotification($alert['product'], $alert['stock']);
+        }
+    }
+
+    private function sendLowStockNotification(\App\Models\Product $product, int $currentStock): void
+    {
+        if (\App\Models\AppSetting::get('notification_low_stock', '1') !== '1') {
+            return;
+        }
+
+        $ownerPhone = \App\Models\AppSetting::get('fonnte_owner_phone') ?: env('FONNTE_OWNER_PHONE', '');
+
+        if (empty($ownerPhone)) {
+            return;
+        }
+
+        app(\App\Services\FonnteService::class)->sendMessage($ownerPhone,
+            "⚠️ *Stok Menipis - Heaven Spot Indonesia*\n\n"
+            . "Produk: {$product->name} ({$product->code})\n"
+            . "Stok saat ini: {$currentStock} kaleng\n"
+            . "Batas minimum: {$product->minimum_stock} kaleng\n\n"
+            . "Segera lakukan pemesanan ke supplier."
+        );
     }
 
     public function updateStockForNewItems(): void
@@ -130,7 +149,7 @@ class SalesOrder extends Model
 
         DB::transaction(function () {
             foreach ($this->items as $item) {
-                $existingMovement = \App\Models\StockMovement::where('reference_id', $this->id)
+                $existingMovement = \App\Models\StockMovement::where('reference_id', $this->getKey())
                     ->where('reference_type', 'sale')
                     ->where('product_id', $item->product_id)
                     ->exists();
@@ -148,11 +167,11 @@ class SalesOrder extends Model
                     $currentStock = $product->fresh()->current_stock;
 
                     \App\Models\StockMovement::create([
-                        'product_id' => $product->id,
+                        'product_id' => $product->getKey(),
                         'user_id' => auth()->id() ?? 1,
                         'type' => 'out',
                         'reference_type' => 'sale',
-                        'reference_id' => $this->id,
+                        'reference_id' => $this->getKey(),
                         'quantity' => $item->quantity,
                         'previous_stock' => $previousStock,
                         'current_stock' => $currentStock,
@@ -165,7 +184,7 @@ class SalesOrder extends Model
         $this->calculateTotal();
     }
 
-    public function rollbackStockForDeletedItem($deletedItem): void
+    public function rollbackStockForDeletedItem(SalesOrderItem $deletedItem): void
     {
         if ($this->status !== 'completed') {
             return;
@@ -180,11 +199,11 @@ class SalesOrder extends Model
             $currentStock = $product->fresh()->current_stock;
 
             \App\Models\StockMovement::create([
-                'product_id' => $product->id,
+                'product_id' => $product->getKey(),
                 'user_id' => auth()->id() ?? 1,
                 'type' => 'in',
                 'reference_type' => 'adjustment',
-                'reference_id' => $this->id,
+                'reference_id' => $this->getKey(),
                 'quantity' => $deletedItem->quantity,
                 'previous_stock' => $previousStock,
                 'current_stock' => $currentStock,
@@ -207,11 +226,11 @@ class SalesOrder extends Model
                 $currentStock = $product->fresh()->current_stock;
 
                 \App\Models\StockMovement::create([
-                    'product_id' => $product->id,
+                    'product_id' => $product->getKey(),
                     'user_id' => auth()->id() ?? 1,
                     'type' => 'in',
                     'reference_type' => 'sale_rollback',
-                    'reference_id' => $this->id,
+                    'reference_id' => $this->getKey(),
                     'quantity' => $item->quantity,
                     'previous_stock' => $previousStock,
                     'current_stock' => $currentStock,

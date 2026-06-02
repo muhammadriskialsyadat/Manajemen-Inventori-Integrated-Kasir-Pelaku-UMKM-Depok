@@ -4,7 +4,7 @@
 
 <head>
     <meta charset="utf-8">
-    <title>{{ ucfirst(str_replace('_', ' ', $reportType)) }} - WAROENG SMART</title>
+    <title>{{ ucfirst(str_replace('_', ' ', $reportType)) }} - Heaven Spot Indonesia</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -27,13 +27,8 @@
             margin-bottom: 5px;
         }
 
-        .waroeng {
-            color: #2563eb;
-        }
-
-        .smart {
-            color: #8b5cf6;
-        }
+        .brand-blue   { color: #60a5fa; }
+        .brand-orange { color: #fb923c; }
 
 
         .report-title {
@@ -140,10 +135,10 @@
 <body>
     <div class="header">
         <div class="company-name">
-            <span class="waroeng">WAROENG</span>
-            <span class="smart">SMART</span>
+            <span class="brand-blue">Heaven Spot</span>
+            <span class="brand-orange"> &bull; Indonesia</span>
         </div>
-        <div>Waroeng Smart Management System</div>
+        <div>Sistem Inventori Heaven Spot Indonesia</div>
         <div class="report-title">
             @if($reportType === 'stock')
             LAPORAN STOK PRODUK
@@ -241,7 +236,7 @@
             @foreach($reportData['sales'] as $sale)
             <tr>
                 <td>{{ $sale->so_number }}</td>
-                <td>{{ $sale->customer->name }}</td>
+                <td>{{ $sale->customer?->name ?? 'N/A' }}</td>
                 <td>{{ $sale->sale_date->format('d/m/Y') }}</td>
                 <td>Rp {{ number_format($sale->total_amount, 0, ',', '.') }}</td>
             </tr>
@@ -275,7 +270,7 @@
             @foreach($reportData['purchases'] as $purchase)
             <tr>
                 <td>{{ $purchase->po_number }}</td>
-                <td>{{ $purchase->supplier->name }}</td>
+                <td>{{ $purchase->supplier?->name ?? 'N/A' }}</td>
                 <td>{{ $purchase->purchase_date->format('d/m/Y') }}</td>
                 <td>Rp {{ number_format($purchase->total_amount, 0, ',', '.') }}</td>
             </tr>
@@ -332,12 +327,12 @@
 
     <div class="footer">
         <div class="footer-left">
-            <strong>Dicetak oleh:</strong> {{ auth()->user()->name }}<br>
+            <strong>Dicetak oleh:</strong> {{ auth()->user()?->name ?? 'System' }}<br>
             <strong>Tanggal:</strong> {{ now()->format('d/m/Y H:i') }}
         </div>
         <div class="footer-right">
-            <strong>WAROENG SMART</strong><br>
-            Waroeng Smart Management System
+            <strong>Heaven Spot Indonesia</strong><br>
+            Sistem Inventori Heaven Spot Indonesia
         </div>
         <div style="clear: both;"></div>
     </div>
