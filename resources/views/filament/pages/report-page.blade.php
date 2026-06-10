@@ -265,7 +265,7 @@
                         <div class="text-blue-600 dark:text-blue-400">Total Transaksi</div>
                     </div>
                     <div class="bg-green-50 dark:bg-green-900/20 p-4 rounded">
-                        <div class="text-2xl font-bold text-green-800 dark:text-green-300">Rp {{ number_format($this->reportData['total_amount'], 0, ',', '.') }}</div>
+                        <div class="text-2xl font-bold text-green-800 dark:text-green-300">Rp {{ number_format($this->reportData['grand_total'], 0, ',', '.') }}</div>
                         <div class="text-green-600 dark:text-green-400">Total Penjualan</div>
                     </div>
                 </div>
@@ -277,16 +277,27 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">No. SO</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Customer</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Tanggal</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Total</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Subtotal</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Diskon</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Pajak</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Grand Total</th>
                             </tr>
                         </thead>
                         <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                             @foreach($this->reportData['sales'] as $sale)
+                            @php
+                                $discountAmt   = $sale->total_amount * ($sale->discount / 100);
+                                $afterDiscount = $sale->total_amount - $discountAmt;
+                                $taxAmt        = $afterDiscount * ($sale->tax / 100);
+                            @endphp
                             <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
                                 <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{{ $sale->so_number }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{{ $sale->customer?->name ?? 'N/A' }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{{ $sale->sale_date->format('d/m/Y') }}</td>
                                 <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">Rp {{ number_format($sale->total_amount, 0, ',', '.') }}</td>
+                                <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{{ $sale->discount }}% (Rp {{ number_format($discountAmt, 0, ',', '.') }})</td>
+                                <td class="px-6 py-4 text-sm text-gray-900 dark:text-gray-100">{{ $sale->tax }}% (Rp {{ number_format($taxAmt, 0, ',', '.') }})</td>
+                                <td class="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-gray-100">Rp {{ number_format($sale->grand_total, 0, ',', '.') }}</td>
                             </tr>
                             @endforeach
                         </tbody>

@@ -214,7 +214,7 @@ class ReportPage extends Page implements HasForms
             'type' => 'sales',
             'sales' => $sales,
             'total_sales' => $sales->count(),
-            'total_amount' => $sales->sum('total_amount'),
+            'grand_total' => $sales->sum('grand_total'),
             'period' => ['start' => $startDate, 'end' => $endDate],
         ];
     }

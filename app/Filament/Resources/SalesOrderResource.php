@@ -118,7 +118,6 @@ class SalesOrderResource extends Resource
                                         $set('quantity', 1);
                                         $set('total_price', $unitPrice);
 
-                                        // Hitung ulang total
                                         $items = collect($get('../../items') ?? []);
                                         $total = $items->sum(fn($item) => (float) ($item['total_price'] ?? 0));
                                         $set('../../total_amount', $total);
@@ -159,23 +158,56 @@ class SalesOrderResource extends Resource
                             ->itemLabel(fn(array $state): ?string => $state['product_id'] ? Product::find($state['product_id'])?->name : null)
                             ->addActionLabel('Tambah Item')
                             ->live()
-                            ->afterStateUpdated(function (Set $set, Get $get, $state) {
-                                $items = collect($state);
-                                $total = $items->sum(fn($item) => (float) ($item['total_price'] ?? 0));
+                            ->afterStateUpdated(function (Set $set, $state) {
+                                $total = collect($state)->sum(fn($item) => (float) ($item['total_price'] ?? 0));
                                 $set('total_amount', $total);
                             }),
                     ]),
 
-                Forms\Components\Section::make('Total Penjualan')
+                Forms\Components\Section::make('Diskon, Pajak & Total')
                     ->schema([
                         Forms\Components\TextInput::make('total_amount')
-                            ->label('Total Pembayaran')
+                            ->label('Subtotal')
                             ->prefix('Rp')
                             ->default(0)
                             ->readOnly()
                             ->dehydrated(true)
                             ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
-                    ]),
+                        Forms\Components\Select::make('discount')
+                            ->label('Diskon (%)')
+                            ->options([
+                                '0'  => 'Tidak Ada Diskon (0%)',
+                                '5'  => 'Diskon 5%',
+                                '10' => 'Diskon 10%',
+                                '15' => 'Diskon 15%',
+                                '20' => 'Diskon 20%',
+                                '25' => 'Diskon 25%',
+                                '50' => 'Diskon 50%',
+                            ])
+                            ->default('0')
+                            ->searchable()
+                            ->live(onBlur: true),
+                        Forms\Components\Select::make('tax')
+                            ->label('Pajak (%)')
+                            ->options([
+                                '0'  => 'Tidak Ada Pajak (0%)',
+                                '11' => 'PPN 11%',
+                                '12' => 'PPN 12%',
+                            ])
+                            ->default('0')
+                            ->searchable()
+                            ->live(onBlur: true),
+                        Forms\Components\Placeholder::make('grand_total')
+                            ->label('Grand Total')
+                            ->content(function (Get $get): string {
+                                $subtotal      = (float) ($get('total_amount') ?? 0);
+                                $discountPct   = (float) ($get('discount') ?? 0);
+                                $taxPct        = (float) ($get('tax') ?? 0);
+                                $afterDiscount = $subtotal - ($subtotal * $discountPct / 100);
+                                $grandTotal    = $afterDiscount + ($afterDiscount * $taxPct / 100);
+                                return 'Rp ' . number_format($grandTotal, 0, ',', '.');
+                            }),
+                    ])->columns(2),
             ])
             ->columns(2);
     }
@@ -196,8 +228,8 @@ class SalesOrderResource extends Resource
                     ->label('Tanggal')
                     ->date()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('total_amount')
-                    ->label('Total')
+                Tables\Columns\TextColumn::make('grand_total')
+                    ->label('Grand Total')
                     ->money('IDR', locale: 'id')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')

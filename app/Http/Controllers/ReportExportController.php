@@ -138,7 +138,7 @@ class ReportExportController extends Controller
             'type' => 'sales',
             'sales' => $sales,
             'total_sales' => $sales->count(),
-            'total_amount' => $sales->sum('total_amount'),
+            'grand_total' => $sales->sum('grand_total'),
             'period' => ['start' => $startDate, 'end' => $endDate],
         ];
     }
@@ -228,7 +228,7 @@ class ReportExport implements FromCollection, WithHeadings, WithMapping, WithSty
     {
         return match ($this->reportType) {
             'stock' => ['Kode', 'Nama Produk', 'Kategori', 'Stok Saat Ini', 'Stok Minimum', 'Status'],
-            'sales' => ['No. SO', 'Customer', 'Tanggal', 'Total Amount', 'Status'],
+            'sales' => ['No. SO', 'Customer', 'Tanggal', 'Subtotal', 'Diskon', 'Diskon (Rp)', 'Pajak', 'Pajak (Rp)', 'Grand Total', 'Status'],
             'purchase' => ['No. PO', 'Supplier', 'Tanggal', 'Total Amount', 'Status'],
             'stock_movement' => ['Tanggal', 'Produk', 'Tipe', 'Quantity', 'Stok Sebelum', 'Stok Sesudah', 'Keterangan'],
             default => [],
@@ -251,6 +251,11 @@ class ReportExport implements FromCollection, WithHeadings, WithMapping, WithSty
                 $row->customer?->name ?? 'N/A',
                 $row->sale_date->format('d/m/Y'),
                 $row->total_amount,
+                $row->discount . '%',
+                round($row->total_amount * $row->discount / 100, 2),
+                $row->tax . '%',
+                round(($row->total_amount - $row->total_amount * $row->discount / 100) * $row->tax / 100, 2),
+                $row->grand_total,
                 ucfirst($row->status)
             ],
             'purchase' => [

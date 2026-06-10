@@ -218,7 +218,7 @@
             <div class="stat-label">Total Transaksi</div>
         </div>
         <div class="stat-item" style="width: 66.66%;">
-            <div class="stat-value">Rp {{ number_format($reportData['total_amount'], 0, ',', '.') }}</div>
+            <div class="stat-value">Rp {{ number_format($reportData['grand_total'], 0, ',', '.') }}</div>
             <div class="stat-label">Total Penjualan</div>
         </div>
     </div>
@@ -229,16 +229,27 @@
                 <th>No. SO</th>
                 <th>Customer</th>
                 <th>Tanggal</th>
-                <th>Total Amount</th>
+                <th>Subtotal</th>
+                <th>Diskon</th>
+                <th>Pajak</th>
+                <th>Grand Total</th>
             </tr>
         </thead>
         <tbody>
             @foreach($reportData['sales'] as $sale)
+            @php
+                $discountAmt = $sale->total_amount * ($sale->discount / 100);
+                $afterDiscount = $sale->total_amount - $discountAmt;
+                $taxAmt = $afterDiscount * ($sale->tax / 100);
+            @endphp
             <tr>
                 <td>{{ $sale->so_number }}</td>
                 <td>{{ $sale->customer?->name ?? 'N/A' }}</td>
                 <td>{{ $sale->sale_date->format('d/m/Y') }}</td>
                 <td>Rp {{ number_format($sale->total_amount, 0, ',', '.') }}</td>
+                <td>{{ $sale->discount }}% (Rp {{ number_format($discountAmt, 0, ',', '.') }})</td>
+                <td>{{ $sale->tax }}% (Rp {{ number_format($taxAmt, 0, ',', '.') }})</td>
+                <td>Rp {{ number_format($sale->grand_total, 0, ',', '.') }}</td>
             </tr>
             @endforeach
         </tbody>

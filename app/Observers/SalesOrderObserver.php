@@ -18,7 +18,7 @@ class SalesOrderObserver
         $ownerPhone   = AppSetting::get('fonnte_owner_phone') ?: env('FONNTE_OWNER_PHONE', '');
         $customer     = $salesOrder->customer;
         $customerName = $customer?->name ?? 'N/A';
-        $total        = number_format((float) $salesOrder->total_amount, 0, ',', '.');
+        $total        = number_format((float) $salesOrder->grand_total, 0, ',', '.');
         $time         = $salesOrder->updated_at->format('d/m/Y H:i');
 
         // Trigger 2 — New Sales Order notification to Owner

@@ -17,13 +17,19 @@ class SalesOrder extends Model
         'customer_id',
         'sale_date',
         'total_amount',
+        'discount',
+        'tax',
+        'grand_total',
         'status',
         'notes',
     ];
 
     protected $casts = [
-        'sale_date' => 'date',
+        'sale_date'    => 'date',
         'total_amount' => 'decimal:2',
+        'discount'     => 'float',
+        'tax'          => 'float',
+        'grand_total'  => 'decimal:2',
     ];
 
     protected static function boot()
@@ -32,19 +38,25 @@ class SalesOrder extends Model
 
         static::creating(function ($salesOrder) {
             $salesOrder->total_amount ??= 0;
-        });
+            $salesOrder->discount     ??= 0;
+            $salesOrder->tax          ??= 0;
 
-        static::created(function () {
-            // Items belum ter-save saat created — stock update di CreateSalesOrder::afterCreate()
-        });
-
-        static::deleting(function ($salesOrder) {
-            if ($salesOrder->status === 'completed') {
-                $salesOrder->rollbackProductStock();
-            }
+            $subtotal      = (float) $salesOrder->total_amount;
+            $discountPct   = (float) $salesOrder->discount;
+            $taxPct        = (float) $salesOrder->tax;
+            $afterDiscount = $subtotal - ($subtotal * $discountPct / 100);
+            $salesOrder->grand_total = $afterDiscount + ($afterDiscount * $taxPct / 100);
         });
 
         static::updating(function ($salesOrder) {
+            if ($salesOrder->isDirty(['total_amount', 'discount', 'tax'])) {
+                $subtotal      = (float) $salesOrder->total_amount;
+                $discountPct   = (float) $salesOrder->discount;
+                $taxPct        = (float) $salesOrder->tax;
+                $afterDiscount = $subtotal - ($subtotal * $discountPct / 100);
+                $salesOrder->grand_total = $afterDiscount + ($afterDiscount * $taxPct / 100);
+            }
+
             $originalStatus = $salesOrder->getOriginal('status');
             $newStatus      = $salesOrder->status;
 
@@ -54,6 +66,16 @@ class SalesOrder extends Model
 
             if (in_array($originalStatus, ['pending', 'cancelled']) && $newStatus === 'completed') {
                 $salesOrder->updateProductStock();
+            }
+        });
+
+        static::created(function () {
+            // Items belum ter-save saat created — stock update di CreateSalesOrder::afterCreate()
+        });
+
+        static::deleting(function ($salesOrder) {
+            if ($salesOrder->status === 'completed') {
+                $salesOrder->rollbackProductStock();
             }
         });
     }
@@ -70,8 +92,14 @@ class SalesOrder extends Model
 
     public function calculateTotal(): void
     {
-        $this->total_amount = $this->items->sum('total_price');
-        $this->save();
+        $subtotal    = (float) $this->items->sum('total_price');
+        $discountPct = (float) ($this->discount ?? 0);
+        $taxPct      = (float) ($this->tax ?? 0);
+        $afterDiscount = $subtotal - ($subtotal * $discountPct / 100);
+
+        $this->total_amount = $subtotal;
+        $this->grand_total  = $afterDiscount + ($afterDiscount * $taxPct / 100);
+        $this->saveQuietly();
     }
 
     public function updateProductStock(): void
