@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\PurchaseOrderResource\Pages;
 use App\Filament\Resources\PurchaseOrderResource\RelationManagers;
 use App\Models\PurchaseOrder;
+use App\Support\Rupiah;
 use Filament\Forms;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
@@ -142,14 +143,14 @@ class PurchaseOrderResource extends Resource
                                     ->prefix('Rp')
                                     ->readOnly()
                                     ->dehydrated()
-                                    ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
+                                    ->formatStateUsing(fn($state) => Rupiah::format($state)),
 
                                 Forms\Components\TextInput::make('total_price')
                                     ->label('Subtotal Item')
                                     ->prefix('Rp')
                                     ->readOnly()
                                     ->dehydrated()
-                                    ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
+                                    ->formatStateUsing(fn($state) => Rupiah::format($state)),
                             ])
 
                             ->columns(4)
@@ -187,7 +188,7 @@ class PurchaseOrderResource extends Resource
                             ->default(0)
                             ->readOnly()
                             ->dehydrated()
-                            ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
+                            ->formatStateUsing(fn($state) => Rupiah::format($state)),
 
                         Forms\Components\Select::make('tax_percentage')
                             ->label('Pajak')
@@ -209,7 +210,7 @@ class PurchaseOrderResource extends Resource
                             ->default(0)
                             ->readOnly()
                             ->dehydrated()
-                            ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
+                            ->formatStateUsing(fn($state) => Rupiah::format($state)),
                     ])->columns(2),
 
                 Forms\Components\Section::make('Total Pembelian')
@@ -220,7 +221,7 @@ class PurchaseOrderResource extends Resource
                             ->default(0)
                             ->readOnly()
                             ->dehydrated(true)
-                            ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
+                            ->formatStateUsing(fn($state) => Rupiah::format($state)),
 
                         Forms\Components\TextInput::make('grand_total')
                             ->label('Grand Total')
@@ -228,7 +229,7 @@ class PurchaseOrderResource extends Resource
                             ->default(0)
                             ->readOnly()
                             ->dehydrated(true)
-                            ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
+                            ->formatStateUsing(fn($state) => Rupiah::format($state)),
                     ])->columns(2),
             ])
             ->columns(2);

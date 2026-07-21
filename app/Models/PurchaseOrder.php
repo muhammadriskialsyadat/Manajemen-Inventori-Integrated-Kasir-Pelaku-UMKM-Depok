@@ -158,23 +158,7 @@ class PurchaseOrder extends Model
 
     private function sendLowStockNotification(\App\Models\Product $product, int $currentStock): void
     {
-        if (\App\Models\AppSetting::get('notification_low_stock', '1') !== '1') {
-            return;
-        }
-
-        $ownerPhone = \App\Models\AppSetting::get('fonnte_owner_phone') ?: env('FONNTE_OWNER_PHONE', '');
-
-        if (empty($ownerPhone)) {
-            return;
-        }
-
-        app(\App\Services\FonnteService::class)->sendMessage($ownerPhone,
-            "⚠️ *Stok Menipis - Heaven Spot Indonesia*\n\n"
-            . "Produk: {$product->name} ({$product->code})\n"
-            . "Stok saat ini: {$currentStock} kaleng\n"
-            . "Batas minimum: {$product->minimum_stock} kaleng\n\n"
-            . "Segera lakukan pemesanan ke supplier."
-        );
+        app(\App\Services\InventoryNotifier::class)->lowStock($product, $currentStock);
     }
 
     public function updateStockForNewItems(): void

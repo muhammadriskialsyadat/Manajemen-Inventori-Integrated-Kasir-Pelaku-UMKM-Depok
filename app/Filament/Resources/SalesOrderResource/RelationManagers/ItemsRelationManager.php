@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\SalesOrderResource\RelationManagers;
 
+use App\Support\Rupiah;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -73,7 +74,7 @@ class ItemsRelationManager extends RelationManager
                     ->prefix('Rp')
                     ->disabled()
                     ->dehydrated()
-                    ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
+                    ->formatStateUsing(fn($state) => Rupiah::format($state)),
             ]);
     }
 

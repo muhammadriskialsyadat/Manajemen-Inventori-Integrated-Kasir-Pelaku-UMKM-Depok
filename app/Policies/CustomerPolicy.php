@@ -2,33 +2,9 @@
 
 namespace App\Policies;
 
-use App\Models\Customer;
-use App\Models\User;
-
-class CustomerPolicy
+class CustomerPolicy extends RolePolicy
 {
-    public function viewAny(User $user): bool
-    {
-        return $user->hasAnyRole(['Owner', 'Kasir', 'Akuntan']);
-    }
+    protected array $viewRoles = ['Owner', 'Kasir', 'Akuntan'];
 
-    public function view(User $user, Customer $customer): bool
-    {
-        return $user->hasAnyRole(['Owner', 'Kasir', 'Akuntan']);
-    }
-
-    public function create(User $user): bool
-    {
-        return $user->hasAnyRole(['Owner', 'Kasir']);
-    }
-
-    public function update(User $user, Customer $customer): bool
-    {
-        return $user->hasAnyRole(['Owner', 'Kasir']);
-    }
-
-    public function delete(User $user, Customer $customer): bool
-    {
-        return $user->hasAnyRole(['Owner', 'Kasir']);
-    }
+    protected array $manageRoles = ['Owner', 'Kasir'];
 }
