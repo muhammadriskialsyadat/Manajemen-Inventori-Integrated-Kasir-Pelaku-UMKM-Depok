@@ -2,9 +2,8 @@
 
 namespace App\Observers;
 
-use App\Models\AppSetting;
 use App\Models\PurchaseOrder;
-use App\Services\FonnteService;
+use App\Services\InventoryNotifier;
 
 class PurchaseOrderObserver
 {
@@ -14,24 +13,7 @@ class PurchaseOrderObserver
             return;
         }
 
-        $ownerPhone = AppSetting::get('fonnte_owner_phone') ?: env('FONNTE_OWNER_PHONE', '');
-
-        if (! $ownerPhone || AppSetting::get('notification_new_purchase', '1') !== '1') {
-            return;
-        }
-
-        $supplierName = $purchaseOrder->supplier?->name ?? 'N/A';
-        $total        = number_format((float) $purchaseOrder->grand_total, 0, ',', '.');
-        $time         = $purchaseOrder->updated_at->format('d/m/Y H:i');
-
         // Trigger 3 — New Purchase Order received notification to Owner
-        app(FonnteService::class)->sendMessage($ownerPhone,
-            "📦 *Barang Diterima - Heaven Spot Indonesia*\n\n"
-            . "No. PO: {$purchaseOrder->po_number}\n"
-            . "Supplier: {$supplierName}\n"
-            . "Total: Rp {$total}\n"
-            . "Waktu: {$time}\n\n"
-            . "Stok produk telah diperbarui otomatis."
-        );
+        app(InventoryNotifier::class)->newPurchase($purchaseOrder);
     }
 }

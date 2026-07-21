@@ -7,6 +7,7 @@ use App\Filament\Resources\SalesOrderResource\RelationManagers;
 use App\Models\SalesOrder;
 use App\Models\Customer;
 use App\Models\Product;
+use App\Support\Rupiah;
 use Filament\Forms;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
@@ -97,7 +98,7 @@ class SalesOrderResource extends Resource
                                     ->label('Produk')
                                     ->options(function () {
                                         return Product::all()->mapWithKeys(function ($product) {
-                                            return [$product->id => "{$product->name} (Stok: {$product->current_stock}) - Rp " . number_format($product->selling_price, 0, ',', '.')];
+                                            return [$product->id => "{$product->name} (Stok: {$product->current_stock}) - " . Rupiah::formatWithPrefix($product->selling_price)];
                                         });
                                     })
                                     ->searchable(['name', 'sku'])
@@ -145,14 +146,14 @@ class SalesOrderResource extends Resource
                                     ->prefix('Rp')
                                     ->readOnly()
                                     ->dehydrated()
-                                    ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
+                                    ->formatStateUsing(fn($state) => Rupiah::format($state)),
 
                                 Forms\Components\TextInput::make('total_price')
                                     ->label('Subtotal Item')
                                     ->prefix('Rp')
                                     ->readOnly()
                                     ->dehydrated()
-                                    ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
+                                    ->formatStateUsing(fn($state) => Rupiah::format($state)),
                             ])
                             ->columns(4)
                             ->itemLabel(fn(array $state): ?string => $state['product_id'] ? Product::find($state['product_id'])?->name : null)
@@ -172,7 +173,7 @@ class SalesOrderResource extends Resource
                             ->default(0)
                             ->readOnly()
                             ->dehydrated(true)
-                            ->formatStateUsing(fn($state) => number_format((float) ($state ?? 0), 0, ',', '.')),
+                            ->formatStateUsing(fn($state) => Rupiah::format($state)),
                         Forms\Components\Select::make('discount')
                             ->label('Diskon (%)')
                             ->options([
@@ -205,7 +206,7 @@ class SalesOrderResource extends Resource
                                 $taxPct        = (float) ($get('tax') ?? 0);
                                 $afterDiscount = $subtotal - ($subtotal * $discountPct / 100);
                                 $grandTotal    = $afterDiscount + ($afterDiscount * $taxPct / 100);
-                                return 'Rp ' . number_format($grandTotal, 0, ',', '.');
+                                return Rupiah::formatWithPrefix($grandTotal);
                             }),
                     ])->columns(2),
             ])
