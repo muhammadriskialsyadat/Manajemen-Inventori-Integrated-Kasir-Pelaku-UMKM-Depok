@@ -154,7 +154,7 @@ class SalesOrder extends Model
             return;
         }
 
-        $ownerPhone = \App\Models\AppSetting::get('fonnte_owner_phone') ?: env('FONNTE_OWNER_PHONE', '');
+        $ownerPhone = \App\Models\AppSetting::get('fonnte_owner_phone') ?: config('services.fonnte.owner_phone', '');
 
         if (empty($ownerPhone)) {
             return;

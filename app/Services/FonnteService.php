@@ -12,7 +12,7 @@ class FonnteService
 
     public function __construct()
     {
-        $this->token = env('FONNTE_TOKEN', '');
+        $this->token = (string) config('services.fonnte.token', '');
     }
 
     public function sendMessage(string $target, string $message): bool

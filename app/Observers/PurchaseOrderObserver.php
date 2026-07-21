@@ -14,7 +14,7 @@ class PurchaseOrderObserver
             return;
         }
 
-        $ownerPhone = AppSetting::get('fonnte_owner_phone') ?: env('FONNTE_OWNER_PHONE', '');
+        $ownerPhone = AppSetting::get('fonnte_owner_phone') ?: config('services.fonnte.owner_phone', '');
 
         if (! $ownerPhone || AppSetting::get('notification_new_purchase', '1') !== '1') {
             return;

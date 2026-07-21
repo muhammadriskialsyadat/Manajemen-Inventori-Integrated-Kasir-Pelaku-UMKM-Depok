@@ -23,9 +23,10 @@ class ReportExportController extends Controller
     {
         ini_set('memory_limit', '256M');
 
-        $reportType = $request->input('report_type');
-        $startDate  = $request->input('start_date');
-        $endDate    = $request->input('end_date');
+        $validated  = $this->validateReportRequest($request);
+        $reportType = $validated['report_type'];
+        $startDate  = $validated['start_date'] ?? null;
+        $endDate    = $validated['end_date'] ?? null;
 
         try {
             $reportData = $this->generateReportData($reportType, $startDate, $endDate);
@@ -68,16 +69,17 @@ class ReportExportController extends Controller
                 'trace'       => $e->getTraceAsString(),
             ]);
 
-            return response('PDF export error: ' . $e->getMessage(), 500)
+            return response('Gagal membuat laporan PDF. Silakan coba lagi.', 500)
                 ->header('Content-Type', 'text/plain');
         }
     }
 
     public function exportExcel(Request $request)
     {
-        $reportType = $request->input('report_type');
-        $startDate  = $request->input('start_date');
-        $endDate    = $request->input('end_date');
+        $validated  = $this->validateReportRequest($request);
+        $reportType = $validated['report_type'];
+        $startDate  = $validated['start_date'] ?? null;
+        $endDate    = $validated['end_date'] ?? null;
 
         try {
             $reportData = $this->generateReportData($reportType, $startDate, $endDate);
@@ -93,9 +95,19 @@ class ReportExportController extends Controller
                 'error'       => $e->getMessage(),
             ]);
 
-            return response('Excel export error: ' . $e->getMessage(), 500)
+            return response('Gagal membuat laporan Excel. Silakan coba lagi.', 500)
                 ->header('Content-Type', 'text/plain');
         }
+    }
+
+    // Validasi input request laporan agar hanya nilai yang diizinkan yang diproses
+    private function validateReportRequest(Request $request): array
+    {
+        return $request->validate([
+            'report_type' => ['required', 'in:stock,sales,purchase,stock_movement'],
+            'start_date'  => ['nullable', 'date', 'required_unless:report_type,stock'],
+            'end_date'    => ['nullable', 'date', 'after_or_equal:start_date', 'required_unless:report_type,stock'],
+        ]);
     }
 
     private function generateReportData($reportType, $startDate, $endDate)
