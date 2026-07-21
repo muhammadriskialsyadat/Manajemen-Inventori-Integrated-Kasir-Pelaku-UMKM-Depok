@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'fonnte' => [
+        'token' => env('FONNTE_TOKEN', ''),
+        'owner_phone' => env('FONNTE_OWNER_PHONE', ''),
+    ],
+
 ];

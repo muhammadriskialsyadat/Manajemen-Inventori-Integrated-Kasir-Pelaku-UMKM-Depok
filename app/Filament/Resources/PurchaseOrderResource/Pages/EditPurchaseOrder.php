@@ -90,6 +90,15 @@ class EditPurchaseOrder extends EditRecord
                     ->send();
             } catch (\Exception $e) {
                 Log::error("Error rolling back stock: " . $e->getMessage());
+
+                // Kembalikan status ke completed agar tidak inkonsisten dengan stok
+                $record->update(['status' => 'completed']);
+
+                Notification::make()
+                    ->title('Gagal Membatalkan Pembelian')
+                    ->body('Stok gagal dikembalikan: ' . $e->getMessage())
+                    ->danger()
+                    ->send();
             }
         }
     }

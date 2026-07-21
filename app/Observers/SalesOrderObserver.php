@@ -15,7 +15,7 @@ class SalesOrderObserver
         }
 
         $fonnte       = app(FonnteService::class);
-        $ownerPhone   = AppSetting::get('fonnte_owner_phone') ?: env('FONNTE_OWNER_PHONE', '');
+        $ownerPhone   = AppSetting::get('fonnte_owner_phone') ?: config('services.fonnte.owner_phone', '');
         $customer     = $salesOrder->customer;
         $customerName = $customer?->name ?? 'N/A';
         $total        = number_format((float) $salesOrder->grand_total, 0, ',', '.');
