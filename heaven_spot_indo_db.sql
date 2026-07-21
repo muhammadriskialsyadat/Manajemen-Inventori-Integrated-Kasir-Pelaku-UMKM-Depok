@@ -455,7 +455,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `name`, `email`, `email_verified_at`, `password`, `role`, `remember_token`, `created_at`, `updated_at`) VALUES
-(1, 'Admin', 'admin@heaven-spot-indo.com', NULL, '$2y$12$qWBS0pOlsR/SrHt88Xd19ubqHhNIRYcUZvgzU4hcaw5mJkt8SgJBS', 'admin', 'af7saRedNTczwSQp53IF6Js4jygczonLt2fmywrM7SiSGCzy57g7yAe0w8nO', '2025-07-17 06:03:17', '2025-07-17 06:03:17');
+(1, 'Admin', 'admin@heaven-spot-indo.com', NULL, '$2y$12$REPLACE_WITH_YOUR_OWN_BCRYPT_HASH_XXXXXXXXXXXXXXXXXXXXXXXX', 'admin', NULL, '2025-07-17 06:03:17', '2025-07-17 06:03:17');
 
 --
 -- Indexes for dumped tables
