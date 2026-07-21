@@ -12,7 +12,10 @@ class FonnteService
 
     public function __construct()
     {
-        $this->token = env('FONNTE_TOKEN', '');
+        // Gunakan config() agar tetap terbaca saat config di-cache (config:cache).
+        // env() di runtime akan mengembalikan null saat config sudah di-cache,
+        // sehingga notifikasi WhatsApp gagal terkirim secara diam-diam.
+        $this->token = (string) config('services.fonnte.token', '');
     }
 
     public function sendMessage(string $target, string $message): bool
