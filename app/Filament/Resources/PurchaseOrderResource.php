@@ -100,7 +100,7 @@ class PurchaseOrderResource extends Resource
                                     ->searchable()
                                     ->required()
                                     ->preload()
-                                    ->live() // ✅ UBAH: live tanpa onBlur
+                                    ->live()
                                     ->afterStateUpdated(function (Set $set, Get $get, $state) {
                                         if (!$state) {
                                             $set('unit_price', 0);
@@ -119,6 +119,14 @@ class PurchaseOrderResource extends Resource
 
                                         // ✅ TRIGGER: Update totals setelah produk dipilih
                                         self::updateTotals($set, $get, $get('../../items'));
+                                    })
+                                    // Tampilkan nama supplier default di bawah nama produk
+                                    // sebagai referensi — bukan constraint
+                                    ->getOptionLabelFromRecordUsing(function ($record) {
+                                        $supplierHint = $record->supplier
+                                            ? " · Supplier: {$record->supplier->name}"
+                                            : '';
+                                        return "{$record->name}{$supplierHint}";
                                     })
                                     ->columnSpan(2),
 

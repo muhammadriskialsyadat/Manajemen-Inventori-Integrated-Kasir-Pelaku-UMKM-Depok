@@ -14,7 +14,8 @@ class PurchaseOrderObserver
             return;
         }
 
-        $ownerPhone = AppSetting::get('fonnte_owner_phone') ?: env('FONNTE_OWNER_PHONE', '');
+        // Gunakan AppSetting langsung — env() tidak bekerja setelah config:cache di production
+        $ownerPhone = AppSetting::get('fonnte_owner_phone', '');
 
         if (! $ownerPhone || AppSetting::get('notification_new_purchase', '1') !== '1') {
             return;
@@ -26,7 +27,7 @@ class PurchaseOrderObserver
 
         // Trigger 3 — New Purchase Order received notification to Owner
         app(FonnteService::class)->sendMessage($ownerPhone,
-            "📦 *Barang Diterima - Heaven Spot Indonesia*\n\n"
+            "📦 *Barang Diterima - UMKM Kota Depok*\n\n"
             . "No. PO: {$purchaseOrder->po_number}\n"
             . "Supplier: {$supplierName}\n"
             . "Total: Rp {$total}\n"

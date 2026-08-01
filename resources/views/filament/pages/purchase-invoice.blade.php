@@ -417,10 +417,10 @@
         {{-- ── HEADER ── --}}
         <div class="header">
             <div class="company-block">
-                <div class="company-name">Heaven Spot <span>Indonesia</span></div>
+                <div class="company-name">UMKM <span>Kota Depok</span></div>
                 <div class="company-tagline">Sistem Inventori & Manajemen Penjualan</div>
                 <div class="company-address">
-                    Heaven Spot Indonesia &bull; Sistem dioperasikan secara digital
+                    UMKM Kota Depok &bull; Sistem dioperasikan secara digital
                 </div>
             </div>
             <div class="doc-block">
@@ -611,11 +611,11 @@
         {{-- ── FOOTER ── --}}
         <div class="doc-footer">
             <div class="footer-left">
-                Dokumen ini digenerate secara otomatis oleh sistem Heaven Spot Indonesia.<br>
+                Dokumen ini digenerate secara otomatis oleh sistem UMKM Kota Depok.<br>
                 Dicetak pada: {{ now()->format('d/m/Y H:i') }} &bull; Oleh: {{ auth()->user()->name }}
             </div>
             <div class="footer-right">
-                <strong>Heaven Spot Indonesia</strong><br>
+                <strong>UMKM Kota Depok</strong><br>
                 {{ $purchaseOrder->po_number }}
             </div>
         </div>

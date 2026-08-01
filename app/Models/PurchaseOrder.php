@@ -168,11 +168,17 @@ class PurchaseOrder extends Model
             return;
         }
 
+        // Sertakan nama supplier default agar owner tahu ke mana harus reorder
+        $supplierInfo = $product->supplier
+            ? "Supplier Default: {$product->supplier->name}\n"
+            : "Supplier Default: Belum ditentukan\n";
+
         app(\App\Services\FonnteService::class)->sendMessage($ownerPhone,
-            "⚠️ *Stok Menipis - Heaven Spot Indonesia*\n\n"
+            "⚠️ *Stok Menipis - UMKM Kota Depok*\n\n"
             . "Produk: {$product->name} ({$product->code})\n"
-            . "Stok saat ini: {$currentStock} kaleng\n"
-            . "Batas minimum: {$product->minimum_stock} kaleng\n\n"
+            . "Stok saat ini: {$currentStock} {$product->unit}\n"
+            . "Batas minimum: {$product->minimum_stock} {$product->unit}\n"
+            . $supplierInfo . "\n"
             . "Segera lakukan pemesanan ke supplier."
         );
     }

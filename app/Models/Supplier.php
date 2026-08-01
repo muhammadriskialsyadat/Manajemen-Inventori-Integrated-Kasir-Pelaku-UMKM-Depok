@@ -22,4 +22,10 @@ class Supplier extends Model
     {
         return $this->hasMany(PurchaseOrder::class);
     }
+
+    // Produk-produk yang menjadikan supplier ini sebagai default supplier.
+    public function products(): HasMany
+    {
+        return $this->hasMany(Product::class);
+    }
 }

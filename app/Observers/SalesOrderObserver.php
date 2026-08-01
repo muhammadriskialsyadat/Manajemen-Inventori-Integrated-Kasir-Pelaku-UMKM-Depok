@@ -15,7 +15,8 @@ class SalesOrderObserver
         }
 
         $fonnte       = app(FonnteService::class);
-        $ownerPhone   = AppSetting::get('fonnte_owner_phone') ?: env('FONNTE_OWNER_PHONE', '');
+        // Gunakan AppSetting langsung — env() tidak bekerja setelah config:cache di production
+        $ownerPhone   = AppSetting::get('fonnte_owner_phone', '');
         $customer     = $salesOrder->customer;
         $customerName = $customer?->name ?? 'N/A';
         $total        = number_format((float) $salesOrder->grand_total, 0, ',', '.');
@@ -24,7 +25,7 @@ class SalesOrderObserver
         // Trigger 2 — New Sales Order notification to Owner
         if ($ownerPhone && AppSetting::get('notification_new_sale', '1') === '1') {
             $fonnte->sendMessage($ownerPhone,
-                "✅ *Penjualan Baru - Heaven Spot Indonesia*\n\n"
+                "✅ *Penjualan Baru - UMKM Kota Depok*\n\n"
                 . "No. Order: {$salesOrder->so_number}\n"
                 . "Pelanggan: {$customerName}\n"
                 . "Total: Rp {$total}\n"
@@ -43,12 +44,12 @@ class SalesOrderObserver
 
             $fonnte->sendMessage($customer->phone,
                 "Halo {$customerName} 👋\n\n"
-                . "Terima kasih telah berbelanja di *Heaven Spot Indonesia*!\n\n"
+                . "Terima kasih telah berbelanja di *UMKM Kota Depok*!\n\n"
                 . "Detail pembelian Anda:\n"
                 . "No. Order: {$salesOrder->so_number}\n"
                 . "Total: Rp {$total}\n"
                 . "Tanggal: {$createdAt}\n\n"
-                . "Terima kasih atas kepercayaan Anda! 🎨"
+                . "Terima kasih atas kepercayaan Anda! 🙏"
             );
         }
     }

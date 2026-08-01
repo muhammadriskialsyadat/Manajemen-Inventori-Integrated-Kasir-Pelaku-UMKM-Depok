@@ -58,12 +58,32 @@ class ProductResource extends Resource
                                 Forms\Components\Textarea::make('description')
                                     ->label('Deskripsi'),
                             ]),
+                        Forms\Components\Select::make('supplier_id')
+                            ->label('Supplier Default')
+                            ->relationship('supplier', 'name')
+                            ->nullable()
+                            ->searchable()
+                            ->preload()
+                            ->placeholder('Pilih supplier default (opsional)')
+                            ->helperText('Supplier yang biasanya menyediakan produk ini. Bersifat referensi — PO tetap bisa memakai supplier lain.')
+                            ->createOptionForm([
+                                Forms\Components\TextInput::make('name')
+                                    ->label('Nama Supplier')
+                                    ->required(),
+                                Forms\Components\TextInput::make('contact_person')
+                                    ->label('Kontak Person'),
+                                Forms\Components\TextInput::make('phone')
+                                    ->label('No. Telepon')
+                                    ->tel(),
+                                Forms\Components\TextInput::make('email')
+                                    ->label('Email')
+                                    ->email(),
+                                Forms\Components\Textarea::make('address')
+                                    ->label('Alamat'),
+                            ]),
                         Forms\Components\TextInput::make('brand')
                             ->label('Brand')
                             ->maxLength(255),
-                        // Forms\Components\TextInput::make('color')
-                        //     ->label('Warna')
-                        //     ->maxLength(100),
                         Forms\Components\TextInput::make('size')
                             ->label('Ukuran')
                             ->placeholder('Contoh: 1L, 2.5L, 5L')
@@ -128,6 +148,12 @@ class ProductResource extends Resource
                     ->label('Kategori')
                     ->searchable()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('supplier.name')
+                    ->label('Supplier Default')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('—')
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('brand')
                     ->label('Brand')
                     ->searchable()
@@ -179,6 +205,10 @@ class ProductResource extends Resource
                 Tables\Filters\SelectFilter::make('category_id')
                     ->label('Kategori')
                     ->relationship('category', 'name'),
+                Tables\Filters\SelectFilter::make('supplier_id')
+                    ->label('Supplier Default')
+                    ->relationship('supplier', 'name')
+                    ->placeholder('Semua Supplier'),
                 Tables\Filters\SelectFilter::make('stock_status')
                     ->label('Status Stok')
                     ->options([

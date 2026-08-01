@@ -16,6 +16,7 @@ class Product extends Model
         'name',
         'code',
         'category_id',
+        'supplier_id',
         'brand',
         'size',
         'unit',
@@ -34,6 +35,14 @@ class Product extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    // Supplier default untuk produk ini.
+    // Nullable — produk lama atau produk yang belum ditentukan supplier-nya
+    // akan bernilai null. Sifatnya referensi, bukan constraint transaksi.
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(Supplier::class);
     }
 
     public function purchaseOrderItems(): HasMany
