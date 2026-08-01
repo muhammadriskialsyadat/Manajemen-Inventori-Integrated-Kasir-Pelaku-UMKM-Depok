@@ -12,7 +12,11 @@ class FonnteService
 
     public function __construct()
     {
-        $this->token = env('FONNTE_TOKEN', '');
+        // Gunakan config() bukan env() langsung.
+        // env() mengembalikan null setelah php artisan config:cache dijalankan di production,
+        // sehingga semua notifikasi WhatsApp akan diam-diam gagal terkirim tanpa error.
+        // Token dibaca dari config/services.php → key 'fonnte.token'.
+        $this->token = config('services.fonnte.token', '');
     }
 
     public function sendMessage(string $target, string $message): bool

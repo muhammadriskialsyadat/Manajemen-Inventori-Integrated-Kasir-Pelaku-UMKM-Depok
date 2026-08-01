@@ -1,5 +1,5 @@
 <?php
-// app/Filament/Resources/PurchaseOrderResource/Pages/ViewPurchaseOrder.php
+
 namespace App\Filament\Resources\PurchaseOrderResource\Pages;
 
 use App\Filament\Resources\PurchaseOrderResource;
@@ -13,6 +13,13 @@ class ViewPurchaseOrder extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('print')
+                ->label('Cetak / PDF')
+                ->icon('heroicon-o-printer')
+                ->color('gray')
+                ->url(fn () => route('purchase-order.invoice', $this->record))
+                ->openUrlInNewTab(),
+
             Actions\EditAction::make(),
             Actions\DeleteAction::make(),
         ];

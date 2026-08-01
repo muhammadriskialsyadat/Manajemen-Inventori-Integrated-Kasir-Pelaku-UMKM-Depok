@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Widgets\RecentStockMovementsWidget;
 use App\Filament\Resources\StockMovementResource\Pages;
 use App\Models\StockMovement;
 use App\Models\Product;
@@ -11,8 +10,6 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Database\Eloquent\Model;
 
 class StockMovementResource extends Resource
 {
@@ -264,46 +261,6 @@ class StockMovementResource extends Resource
             'create' => Pages\CreateStockMovement::route('/create'),
             'view' => Pages\ViewStockMovement::route('/{record}'),
         ];
-    }
-
-    public static function createRecord(array $data): Model
-    {
-        $product = Product::find($data['product_id']);
-        $previousStock = $product->current_stock;
-        $adjustmentType = $data['adjustment_type'];
-        $quantity = (int) $data['quantity'];
-
-        $newStock = match ($adjustmentType) {
-            'add' => $previousStock + $quantity,
-            'reduce' => $previousStock - $quantity,
-            'correction' => $quantity,
-            default => $previousStock
-        };
-
-        if ($newStock < 0) {
-            throw new \Exception('Stok tidak boleh negatif setelah adjustment');
-        }
-
-        $product->update(['current_stock' => $newStock]);
-
-        $movementType = match ($adjustmentType) {
-            'add', 'correction' => 'in',
-            'reduce' => 'out',
-            default => 'adjustment'
-        };
-
-        $movementQuantity = $adjustmentType === 'correction'
-            ? abs($previousStock - $quantity)
-            : $quantity;
-
-        return parent::createRecord(array_merge($data, [
-            'user_id' => Auth::id() ?? 1,
-            'type' => $movementType,
-            'reference_type' => 'adjustment',
-            'quantity' => $movementQuantity,
-            'previous_stock' => $previousStock,
-            'current_stock' => $newStock,
-        ]));
     }
 
     public static function getNavigationBadge(): ?string

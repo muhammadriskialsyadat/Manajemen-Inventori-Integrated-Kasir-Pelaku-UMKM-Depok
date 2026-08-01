@@ -167,3 +167,4 @@ Jangan tambahkan fitur-fitur berikut karena di luar scope penelitian:
 5. Setiap perubahan pada struktur database harus
    menggunakan Laravel Migration (jangan ubah database
    langsung)
+   

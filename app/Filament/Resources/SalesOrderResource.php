@@ -96,13 +96,26 @@ class SalesOrderResource extends Resource
                                 Forms\Components\Select::make('product_id')
                                     ->label('Produk')
                                     ->options(function () {
-                                        return Product::all()->mapWithKeys(function ($product) {
-                                            return [$product->id => "{$product->name} (Stok: {$product->current_stock}) - Rp " . number_format($product->selling_price, 0, ',', '.')];
-                                        });
+                                        // Hanya tampilkan produk yang stoknya > 0
+                                        // Produk habis (current_stock <= 0) tidak ditampilkan
+                                        return Product::where('current_stock', '>', 0)
+                                            ->orderBy('name')
+                                            ->get()
+                                            ->mapWithKeys(function ($product) {
+                                                // Tandai produk yang stoknya menipis
+                                                $stockLabel = $product->current_stock <= $product->minimum_stock
+                                                    ? "⚠️ Menipis: {$product->current_stock}"
+                                                    : "Stok: {$product->current_stock}";
+
+                                                return [
+                                                    $product->id => "{$product->name} ({$stockLabel}) - Rp " . number_format($product->selling_price, 0, ',', '.')
+                                                ];
+                                            });
                                     })
-                                    ->searchable(['name', 'sku'])
+                                    ->searchable()
                                     ->required()
-                                    ->preload()
+                                    ->noSearchResultsMessage('Produk tidak ditemukan atau stok habis.')
+                                    ->placeholder('Pilih produk...')
                                     ->live(onBlur: true)
                                     ->afterStateUpdated(function (Set $set, Get $get, $state) {
                                         if (!$state) {
@@ -320,16 +333,21 @@ class SalesOrderResource extends Resource
                     ->modalHeading('Konfirmasi Pembatalan')
                     ->modalDescription('Apakah Anda yakin ingin membatalkan penjualan ini? Jika sudah completed, stok akan dikembalikan.')
                     ->action(function ($record) {
-                        $oldStatus = $record->status;
+                        // ─────────────────────────────────────────────────────────
+                        // PENTING — JANGAN panggil rollbackProductStock() di sini.
+                        //
+                        // SalesOrder::boot updating() sudah menangani rollback stok
+                        // secara otomatis ketika status berubah completed → cancelled.
+                        //
+                        // Memanggil rollbackProductStock() manual di sini akan
+                        // menyebabkan stok dikembalikan DUA KALI.
+                        // ─────────────────────────────────────────────────────────
                         $record->status = 'cancelled';
                         $record->save();
 
-                        if ($oldStatus === 'completed') {
-                            $record->rollbackProductStock();
-                        }
-
                         Notification::make()
-                            ->title('Penjualan berhasil dibatalkan')
+                            ->title('Penjualan Dibatalkan')
+                            ->body('Status berhasil diubah ke Cancelled. Stok produk telah dikembalikan jika sebelumnya sudah Completed.')
                             ->success()
                             ->send();
                     })

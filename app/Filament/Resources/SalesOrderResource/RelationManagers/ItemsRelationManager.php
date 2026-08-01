@@ -8,7 +8,6 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\DB;
 
 class ItemsRelationManager extends RelationManager
 {
@@ -26,7 +25,7 @@ class ItemsRelationManager extends RelationManager
             ->schema([
                 Forms\Components\Select::make('product_id')
                     ->label('Produk')
-                    ->relationship('product', 'name')
+                    ->relationship('product', 'name', fn ($query) => $query->where('current_stock', '>', 0)->orderBy('name'))
                     ->required()
                     ->searchable()
                     ->preload()
@@ -40,7 +39,13 @@ class ItemsRelationManager extends RelationManager
                             $set('total_price', $unitPrice);
                         }
                     })
-                    ->getOptionLabelFromRecordUsing(fn($record) => "{$record->name} (Stok: {$record->current_stock})"),
+                    ->noSearchResultsMessage('Produk tidak ditemukan atau stok habis.')
+                    ->getOptionLabelFromRecordUsing(function ($record) {
+                        $stockLabel = $record->current_stock <= $record->minimum_stock
+                            ? "⚠️ Menipis: {$record->current_stock}"
+                            : "Stok: {$record->current_stock}";
+                        return "{$record->name} ({$stockLabel})";
+                    }),
 
                 Forms\Components\TextInput::make('quantity')
                     ->label('Jumlah')
@@ -106,6 +111,7 @@ class ItemsRelationManager extends RelationManager
                     ->before(function ($data) {
                         $so = $this->getOwnerRecord();
 
+                        // Validasi stok sebelum item baru ditambahkan ke SO completed
                         if ($so->status === 'completed') {
                             $product = \App\Models\Product::find($data['product_id']);
                             if ($product->current_stock < $data['quantity']) {
@@ -123,6 +129,9 @@ class ItemsRelationManager extends RelationManager
                         $so = $this->getOwnerRecord();
                         $so->calculateTotal();
 
+                        // Item baru pada SO completed tidak melalui boot updating —
+                        // harus dihandle manual via updateStockForNewItems()
+                        // yang cek existingMovement sebelum update stok.
                         if ($so->status === 'completed') {
                             $so->updateStockForNewItems();
                         }
@@ -130,16 +139,15 @@ class ItemsRelationManager extends RelationManager
             ])
             ->actions([
                 Tables\Actions\EditAction::make()
-                    ->mutateRecordDataUsing(function (array $data, $record): array {
-                        cache()->put("edit_so_item_{$record->id}_old_qty", $record->quantity, 300);
-                        return $data;
-                    })
                     ->before(function ($record, $data) {
                         $so = $this->getOwnerRecord();
 
+                        // Validasi stok jika qty bertambah pada SO completed.
+                        // Validasi dilakukan sebelum save agar bisa di-halt sebelum
+                        // SalesOrderItem::boot updating() ikut berjalan.
                         if ($so->status === 'completed') {
-                            $oldQty = cache()->get("edit_so_item_{$record->id}_old_qty", $record->quantity);
-                            $newQty = $data['quantity'];
+                            $oldQty = $record->quantity;
+                            $newQty = (int) $data['quantity'];
                             $diff   = $newQty - $oldQty;
 
                             if ($diff > 0) {
@@ -158,35 +166,28 @@ class ItemsRelationManager extends RelationManager
                     })
                     ->after(function ($record) {
                         $so = $this->getOwnerRecord();
+
+                        // Recalculate total SO setelah item diubah.
                         $so->calculateTotal();
 
-                        if ($so->status === 'completed') {
-                            $oldQty = cache()->get("edit_so_item_{$record->id}_old_qty");
-
-                            if ($oldQty === null) {
-                                Notification::make()
-                                    ->title('Error')
-                                    ->body('Gagal mengambil data quantity lama. Silakan refresh halaman.')
-                                    ->danger()
-                                    ->send();
-                                return;
-                            }
-
-                            $newQty = $record->quantity;
-                            $diff   = $newQty - $oldQty;
-
-                            if ($diff != 0) {
-                                $this->updateStockForEditedItem($record, $diff, $oldQty, $newQty);
-                            }
-
-                            cache()->forget("edit_so_item_{$record->id}_old_qty");
-                        }
+                        // ─────────────────────────────────────────────────────────
+                        // STOK TIDAK diupdate di sini.
+                        //
+                        // SalesOrderItem::boot updating() sudah menangani
+                        // stock adjustment secara otomatis menggunakan getOriginal('quantity')
+                        // ketika $record->save() dipanggil oleh EditAction.
+                        //
+                        // Memanggil updateStockForEditedItem() di sini akan
+                        // menyebabkan stok bergerak DUA KALI.
+                        // ─────────────────────────────────────────────────────────
                     }),
 
                 Tables\Actions\DeleteAction::make()
                     ->before(function ($record) {
                         $so = $this->getOwnerRecord();
 
+                        // Item yang dihapus tidak melalui boot updating —
+                        // rollback stok harus dilakukan manual sebelum delete.
                         if ($so->status === 'completed') {
                             $so->rollbackStockForDeletedItem($record);
                         }
@@ -195,46 +196,5 @@ class ItemsRelationManager extends RelationManager
                         $this->getOwnerRecord()->calculateTotal();
                     }),
             ]);
-    }
-
-    protected function updateStockForEditedItem($item, int $diff, int $oldQty, int $newQty): void
-    {
-        DB::transaction(function () use ($item, $diff, $oldQty, $newQty) {
-            $product       = $item->product()->lockForUpdate()->first();
-            $previousStock = $product->current_stock;
-
-            if ($diff > 0) {
-                // Qty bertambah = stok berkurang
-                $newStock = $previousStock - abs($diff);
-                $type     = 'out';
-            } else {
-                // Qty berkurang = stok bertambah
-                $newStock = $previousStock + abs($diff);
-                $type     = 'in';
-            }
-
-            $notes = "Edit SO item (qty {$oldQty}→{$newQty}) - SO: {$item->salesOrder->so_number}";
-
-            $product->current_stock = $newStock;
-            $product->save();
-
-            \App\Models\StockMovement::create([
-                'product_id'     => $product->getKey(),
-                'user_id'        => auth()->id() ?? 1,
-                'type'           => $type,
-                'reference_type' => 'sale',
-                'reference_id'   => $item->sales_order_id,
-                'quantity'       => abs($diff),
-                'previous_stock' => $previousStock,
-                'current_stock'  => $newStock,
-                'notes'          => $notes,
-            ]);
-
-            Notification::make()
-                ->title('Stok diperbarui')
-                ->body("{$product->name}: {$previousStock} → {$newStock}")
-                ->success()
-                ->send();
-        });
     }
 }

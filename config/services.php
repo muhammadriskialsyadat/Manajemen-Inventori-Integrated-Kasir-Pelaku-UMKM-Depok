@@ -35,4 +35,11 @@ return [
         ],
     ],
 
+    // Fonnte WhatsApp API
+    // Gunakan config('services.fonnte.token') — JANGAN gunakan env() langsung
+    // karena env() mengembalikan null setelah php artisan config:cache di production.
+    'fonnte' => [
+        'token' => env('FONNTE_TOKEN', ''),
+    ],
+
 ];

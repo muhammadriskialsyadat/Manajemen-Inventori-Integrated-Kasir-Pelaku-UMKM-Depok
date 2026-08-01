@@ -64,6 +64,7 @@ class ReportPage extends Page implements HasForms
                             'purchase'       => 'Laporan Pembelian',
                             'sales'          => 'Laporan Penjualan',
                             'stock_movement' => 'Laporan Pergerakan Stok',
+                            'tax'            => 'Laporan PPN',
                         ];
 
                         if ($user?->hasRole('Gudang')) {
@@ -108,6 +109,7 @@ class ReportPage extends Page implements HasForms
                 'purchase' => $this->generatePurchaseReport($data['start_date'], $data['end_date']),
                 'sales' => $this->generateSalesReport($data['start_date'], $data['end_date']),
                 'stock_movement' => $this->generateStockMovementReport($data['start_date'], $data['end_date']),
+                'tax' => $this->generateTaxReport($data['start_date'], $data['end_date']),
                 default => null,
             };
 
@@ -152,6 +154,7 @@ class ReportPage extends Page implements HasForms
             'purchase' => $reportData['total_purchases'] ?? 0,
             'sales' => $reportData['total_sales'] ?? 0,
             'stock_movement' => $reportData['total_movements'] ?? 0,
+            'tax' => $reportData['total_records'] ?? 0,
             default => 0,
         };
     }
@@ -238,6 +241,68 @@ class ReportPage extends Page implements HasForms
             'total_in' => $movements->where('type', 'in')->sum('quantity'),
             'total_out' => $movements->where('type', 'out')->sum('quantity'),
             'period' => ['start' => $startDate, 'end' => $endDate],
+        ];
+    }
+
+    private function generateTaxReport($startDate, $endDate)
+    {
+        $start = Carbon::parse($startDate)->format('Y-m-d');
+        $end   = Carbon::parse($endDate)->format('Y-m-d');
+
+        // ── PPN Keluaran — dari Penjualan ke Customer ──────────────────
+        $sales = SalesOrder::with('customer')
+            ->whereDate('sale_date', '>=', $start)
+            ->whereDate('sale_date', '<=', $end)
+            ->where('status', 'completed')
+            ->where('tax', '>', 0)
+            ->orderBy('sale_date')
+            ->get()
+            ->map(function ($so) {
+                $afterDiscount = (float) $so->total_amount * (1 - (float) $so->discount / 100);
+                $taxAmount     = $afterDiscount * ((float) $so->tax / 100);
+                return [
+                    'number'      => $so->so_number,
+                    'date'        => $so->sale_date->format('d/m/Y'),
+                    'party'       => $so->customer?->name ?? '-',
+                    'dpp'         => round($afterDiscount, 2),
+                    'tax_rate'    => $so->tax,
+                    'tax_amount'  => round($taxAmount, 2),
+                    'grand_total' => (float) $so->grand_total,
+                ];
+            });
+
+        // ── PPN Masukan — dari Pembelian ke Supplier ───────────────────
+        $purchases = PurchaseOrder::with('supplier')
+            ->whereDate('purchase_date', '>=', $start)
+            ->whereDate('purchase_date', '<=', $end)
+            ->where('status', 'completed')
+            ->where('tax_percentage', '>', 0)
+            ->orderBy('purchase_date')
+            ->get()
+            ->map(function ($po) {
+                return [
+                    'number'      => $po->po_number,
+                    'date'        => $po->purchase_date->format('d/m/Y'),
+                    'party'       => $po->supplier?->name ?? '-',
+                    'dpp'         => round((float) $po->subtotal - (float) $po->discount_amount, 2),
+                    'tax_rate'    => (float) $po->tax_percentage,
+                    'tax_amount'  => round((float) $po->tax_amount, 2),
+                    'grand_total' => (float) $po->grand_total,
+                ];
+            });
+
+        $totalTaxOut = $sales->sum('tax_amount');
+        $totalTaxIn  = $purchases->sum('tax_amount');
+
+        return [
+            'type'           => 'tax',
+            'sales'          => $sales,
+            'purchases'      => $purchases,
+            'total_tax_out'  => $totalTaxOut,
+            'total_tax_in'   => $totalTaxIn,
+            'tax_difference' => $totalTaxOut - $totalTaxIn,
+            'total_records'  => $sales->count() + $purchases->count(),
+            'period'         => ['start' => $startDate, 'end' => $endDate],
         ];
     }
 }

@@ -8,7 +8,6 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\DB;
 
 class ItemsRelationManager extends RelationManager
 {
@@ -33,7 +32,7 @@ class ItemsRelationManager extends RelationManager
                     ->reactive()
                     ->afterStateUpdated(function ($state, callable $set) {
                         if ($state) {
-                            $product = \App\Models\Product::find($state);
+                            $product   = \App\Models\Product::find($state);
                             $unitPrice = (float) ($product?->purchase_price ?? 0);
                             $set('unit_price', $unitPrice);
                             $set('quantity', 1);
@@ -102,6 +101,9 @@ class ItemsRelationManager extends RelationManager
                         $po = $this->getOwnerRecord();
                         $po->calculateTotal();
 
+                        // Item baru pada PO completed tidak melalui boot updating —
+                        // harus dihandle manual via updateStockForNewItems()
+                        // yang cek existingMovement sebelum update stok.
                         if ($po->status === 'completed') {
                             $po->updateStockForNewItems();
                         }
@@ -109,41 +111,30 @@ class ItemsRelationManager extends RelationManager
             ])
             ->actions([
                 Tables\Actions\EditAction::make()
-                    ->mutateRecordDataUsing(function (array $data, $record): array {
-                        cache()->put("edit_po_item_{$record->id}_old_qty", $record->quantity, 300);
-                        return $data;
-                    })
                     ->after(function ($record) {
                         $po = $this->getOwnerRecord();
+
+                        // Recalculate total PO setelah item diubah.
                         $po->calculateTotal();
 
-                        if ($po->status === 'completed') {
-                            $oldQty = cache()->get("edit_po_item_{$record->id}_old_qty");
-
-                            if ($oldQty === null) {
-                                Notification::make()
-                                    ->title('Error')
-                                    ->body('Gagal mengambil data quantity lama. Silakan refresh halaman.')
-                                    ->danger()
-                                    ->send();
-                                return;
-                            }
-
-                            $newQty = $record->quantity;
-                            $diff   = $newQty - $oldQty;
-
-                            if ($diff != 0) {
-                                $this->updateStockForEditedItem($record, $diff, $oldQty, $newQty);
-                            }
-
-                            cache()->forget("edit_po_item_{$record->id}_old_qty");
-                        }
+                        // ─────────────────────────────────────────────────────────
+                        // STOK TIDAK diupdate di sini.
+                        //
+                        // PurchaseOrderItem::boot updating() sudah menangani
+                        // stock adjustment secara otomatis menggunakan getOriginal('quantity')
+                        // ketika $record->save() dipanggil oleh EditAction.
+                        //
+                        // Memanggil updateStockForEditedItem() di sini akan
+                        // menyebabkan stok bergerak DUA KALI.
+                        // ─────────────────────────────────────────────────────────
                     }),
 
                 Tables\Actions\DeleteAction::make()
                     ->before(function ($record) {
                         $po = $this->getOwnerRecord();
 
+                        // Item yang dihapus tidak melalui boot updating —
+                        // rollback stok harus dilakukan manual sebelum delete.
                         if ($po->status === 'completed') {
                             $po->rollbackStockForDeletedItem($record);
                         }
@@ -152,44 +143,5 @@ class ItemsRelationManager extends RelationManager
                         $this->getOwnerRecord()->calculateTotal();
                     }),
             ]);
-    }
-
-    protected function updateStockForEditedItem($item, int $diff, int $oldQty, int $newQty): void
-    {
-        DB::transaction(function () use ($item, $diff, $oldQty, $newQty) {
-            $product       = $item->product()->lockForUpdate()->first();
-            $previousStock = $product->current_stock;
-
-            if ($diff > 0) {
-                $newStock = $previousStock + abs($diff);
-                $type     = 'in';
-            } else {
-                $newStock = $previousStock - abs($diff);
-                $type     = 'out';
-            }
-
-            $notes = "Edit PO item (qty {$oldQty}→{$newQty}) - PO: {$item->purchaseOrder->po_number}";
-
-            $product->current_stock = $newStock;
-            $product->save();
-
-            \App\Models\StockMovement::create([
-                'product_id'     => $product->getKey(),
-                'user_id'        => auth()->id() ?? 1,
-                'type'           => $type,
-                'reference_type' => 'purchase',
-                'reference_id'   => $item->purchase_order_id,
-                'quantity'       => abs($diff),
-                'previous_stock' => $previousStock,
-                'current_stock'  => $newStock,
-                'notes'          => $notes,
-            ]);
-
-            Notification::make()
-                ->title('Stok diperbarui')
-                ->body("{$product->name}: {$previousStock} → {$newStock}")
-                ->success()
-                ->send();
-        });
     }
 }

@@ -428,6 +428,219 @@
             </div>
             @endif
 
+            <!-- Tax / PPN Report -->
+            @if($this->reportData['type'] === 'tax')
+            <div class="report-card bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+
+                {{-- Header --}}
+                <h3 class="text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">Laporan PPN</h3>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                    Periode: {{ \Carbon\Carbon::parse($this->reportData['period']['start'])->format('d/m/Y') }} —
+                    {{ \Carbon\Carbon::parse($this->reportData['period']['end'])->format('d/m/Y') }}
+                </p>
+
+                {{-- Summary Cards --}}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                        <div class="text-xs font-semibold text-red-500 dark:text-red-400 uppercase tracking-wide mb-1">
+                            PPN Keluaran
+                        </div>
+                        <div class="text-xs text-red-400 dark:text-red-500 mb-2">Dari Penjualan ke Customer</div>
+                        <div class="text-2xl font-bold text-red-700 dark:text-red-300">
+                            Rp {{ number_format($this->reportData['total_tax_out'], 0, ',', '.') }}
+                        </div>
+                        <div class="text-xs text-red-500 dark:text-red-400 mt-1">
+                            {{ $this->reportData['sales']->count() }} transaksi
+                        </div>
+                    </div>
+
+                    <div class="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                        <div class="text-xs font-semibold text-green-500 dark:text-green-400 uppercase tracking-wide mb-1">
+                            PPN Masukan
+                        </div>
+                        <div class="text-xs text-green-400 dark:text-green-500 mb-2">Dari Pembelian ke Supplier</div>
+                        <div class="text-2xl font-bold text-green-700 dark:text-green-300">
+                            Rp {{ number_format($this->reportData['total_tax_in'], 0, ',', '.') }}
+                        </div>
+                        <div class="text-xs text-green-500 dark:text-green-400 mt-1">
+                            {{ $this->reportData['purchases']->count() }} transaksi
+                        </div>
+                    </div>
+
+                    @php $diff = $this->reportData['tax_difference']; @endphp
+                    <div class="{{ $diff >= 0 ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800' : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' }} border rounded-lg p-4">
+                        <div class="text-xs font-semibold {{ $diff >= 0 ? 'text-orange-500 dark:text-orange-400' : 'text-blue-500 dark:text-blue-400' }} uppercase tracking-wide mb-1">
+                            {{ $diff >= 0 ? 'Kurang Bayar (KB)' : 'Lebih Bayar (LB)' }}
+                        </div>
+                        <div class="text-xs {{ $diff >= 0 ? 'text-orange-400 dark:text-orange-500' : 'text-blue-400 dark:text-blue-500' }} mb-2">
+                            PPN Keluaran — PPN Masukan
+                        </div>
+                        <div class="text-2xl font-bold {{ $diff >= 0 ? 'text-orange-700 dark:text-orange-300' : 'text-blue-700 dark:text-blue-300' }}">
+                            Rp {{ number_format(abs($diff), 0, ',', '.') }}
+                        </div>
+                        <div class="text-xs {{ $diff >= 0 ? 'text-orange-500' : 'text-blue-500' }} mt-1">
+                            {{ $diff >= 0 ? 'PPN yang harus disetorkan' : 'PPN lebih bayar / dapat dikreditkan' }}
+                        </div>
+                    </div>
+                </div>
+
+                {{-- BAGIAN 1: PPN Keluaran --}}
+                <div class="mb-8">
+                    <div class="flex items-center gap-2 mb-3">
+                        <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                        <h4 class="text-base font-semibold text-gray-800 dark:text-gray-200">
+                            PPN Keluaran — Penjualan ke Customer
+                        </h4>
+                    </div>
+
+                    @if($this->reportData['sales']->count() > 0)
+                    <div class="overflow-x-auto">
+                        <table class="report-table min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+                            <thead class="bg-red-50 dark:bg-red-900/30">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">No. SO</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Tanggal</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Pelanggan</th>
+                                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">DPP (Rp)</th>
+                                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Tarif</th>
+                                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Nilai PPN (Rp)</th>
+                                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Total Tagihan (Rp)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
+                                @foreach($this->reportData['sales'] as $row)
+                                <tr class="hover:bg-red-50/50 dark:hover:bg-red-900/10">
+                                    <td class="px-4 py-3 text-gray-900 dark:text-gray-100 font-mono text-xs">{{ $row['number'] }}</td>
+                                    <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $row['date'] }}</td>
+                                    <td class="px-4 py-3 text-gray-900 dark:text-gray-100">{{ $row['party'] }}</td>
+                                    <td class="px-4 py-3 text-right text-gray-900 dark:text-gray-100">{{ number_format($row['dpp'], 0, ',', '.') }}</td>
+                                    <td class="px-4 py-3 text-center">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300">
+                                            {{ $row['tax_rate'] }}%
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 text-right font-semibold text-red-700 dark:text-red-300">{{ number_format($row['tax_amount'], 0, ',', '.') }}</td>
+                                    <td class="px-4 py-3 text-right text-gray-900 dark:text-gray-100">{{ number_format($row['grand_total'], 0, ',', '.') }}</td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                            <tfoot class="bg-red-50 dark:bg-red-900/20">
+                                <tr>
+                                    <td colspan="5" class="px-4 py-3 text-right text-sm font-bold text-gray-700 dark:text-gray-300">
+                                        Total PPN Keluaran
+                                    </td>
+                                    <td class="px-4 py-3 text-right text-sm font-bold text-red-700 dark:text-red-300">
+                                        Rp {{ number_format($this->reportData['total_tax_out'], 0, ',', '.') }}
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    @else
+                    <div class="text-center py-6 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                        <p class="text-gray-500 dark:text-gray-400 text-sm">Tidak ada penjualan dengan PPN pada periode ini.</p>
+                    </div>
+                    @endif
+                </div>
+
+                {{-- BAGIAN 2: PPN Masukan --}}
+                <div class="mb-8">
+                    <div class="flex items-center gap-2 mb-3">
+                        <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                        <h4 class="text-base font-semibold text-gray-800 dark:text-gray-200">
+                            PPN Masukan — Pembelian dari Supplier
+                        </h4>
+                    </div>
+
+                    @if($this->reportData['purchases']->count() > 0)
+                    <div class="overflow-x-auto">
+                        <table class="report-table min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+                            <thead class="bg-green-50 dark:bg-green-900/30">
+                                <tr>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">No. PO</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Tanggal</th>
+                                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Supplier</th>
+                                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">DPP (Rp)</th>
+                                    <th class="px-4 py-3 text-center text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Tarif</th>
+                                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Nilai PPN (Rp)</th>
+                                    <th class="px-4 py-3 text-right text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase">Total Tagihan (Rp)</th>
+                                </tr>
+                            </thead>
+                            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
+                                @foreach($this->reportData['purchases'] as $row)
+                                <tr class="hover:bg-green-50/50 dark:hover:bg-green-900/10">
+                                    <td class="px-4 py-3 text-gray-900 dark:text-gray-100 font-mono text-xs">{{ $row['number'] }}</td>
+                                    <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ $row['date'] }}</td>
+                                    <td class="px-4 py-3 text-gray-900 dark:text-gray-100">{{ $row['party'] }}</td>
+                                    <td class="px-4 py-3 text-right text-gray-900 dark:text-gray-100">{{ number_format($row['dpp'], 0, ',', '.') }}</td>
+                                    <td class="px-4 py-3 text-center">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300">
+                                            {{ $row['tax_rate'] }}%
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 text-right font-semibold text-green-700 dark:text-green-300">{{ number_format($row['tax_amount'], 0, ',', '.') }}</td>
+                                    <td class="px-4 py-3 text-right text-gray-900 dark:text-gray-100">{{ number_format($row['grand_total'], 0, ',', '.') }}</td>
+                                </tr>
+                                @endforeach
+                            </tbody>
+                            <tfoot class="bg-green-50 dark:bg-green-900/20">
+                                <tr>
+                                    <td colspan="5" class="px-4 py-3 text-right text-sm font-bold text-gray-700 dark:text-gray-300">
+                                        Total PPN Masukan
+                                    </td>
+                                    <td class="px-4 py-3 text-right text-sm font-bold text-green-700 dark:text-green-300">
+                                        Rp {{ number_format($this->reportData['total_tax_in'], 0, ',', '.') }}
+                                    </td>
+                                    <td></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                    @else
+                    <div class="text-center py-6 bg-gray-50 dark:bg-gray-700/30 rounded-lg">
+                        <p class="text-gray-500 dark:text-gray-400 text-sm">Tidak ada pembelian dengan PPN pada periode ini.</p>
+                    </div>
+                    @endif
+                </div>
+
+                {{-- BAGIAN 3: Rekap Akhir --}}
+                <div class="border-t border-gray-200 dark:border-gray-700 pt-6">
+                    <h4 class="text-base font-semibold text-gray-800 dark:text-gray-200 mb-4">Rekap PPN Periode Ini</h4>
+                    <div class="max-w-sm ml-auto">
+                        <table class="w-full text-sm">
+                            <tbody>
+                                <tr>
+                                    <td class="py-2 text-gray-600 dark:text-gray-400">Total PPN Keluaran</td>
+                                    <td class="py-2 text-right font-semibold text-red-700 dark:text-red-300">
+                                        Rp {{ number_format($this->reportData['total_tax_out'], 0, ',', '.') }}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 text-gray-600 dark:text-gray-400">Total PPN Masukan</td>
+                                    <td class="py-2 text-right font-semibold text-green-700 dark:text-green-300">
+                                        Rp {{ number_format($this->reportData['total_tax_in'], 0, ',', '.') }}
+                                    </td>
+                                </tr>
+                                <tr class="border-t border-gray-300 dark:border-gray-600">
+                                    <td class="py-3 font-bold text-gray-900 dark:text-gray-100">
+                                        {{ $diff >= 0 ? 'PPN Kurang Bayar (KB)' : 'PPN Lebih Bayar (LB)' }}
+                                    </td>
+                                    <td class="py-3 text-right text-lg font-bold {{ $diff >= 0 ? 'text-orange-600 dark:text-orange-400' : 'text-blue-600 dark:text-blue-400' }}">
+                                        Rp {{ number_format(abs($this->reportData['tax_difference']), 0, ',', '.') }}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <p class="text-xs text-gray-400 dark:text-gray-500 mt-3">
+                            * Laporan ini merupakan rekap internal. Pelaporan resmi PPN tetap melalui e-Faktur DJP.
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+            @endif
+
         </div>
         @endif
     </div>

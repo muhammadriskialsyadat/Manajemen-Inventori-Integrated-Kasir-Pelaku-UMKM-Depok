@@ -9,6 +9,7 @@ use Filament\Forms;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -348,9 +349,29 @@ class PurchaseOrderResource extends Resource
                     ->icon('heroicon-o-check')
                     ->color('success')
                     ->requiresConfirmation()
+                    ->modalHeading('Konfirmasi Penyelesaian Pembelian')
+                    ->modalDescription('Stok produk akan ditambah sesuai item yang dibeli. Pastikan semua item sudah benar sebelum melanjutkan.')
                     ->action(function ($record) {
+                        // Validasi: PO harus punya minimal 1 item sebelum bisa diselesaikan
+                        if ($record->items()->count() === 0) {
+                            Notification::make()
+                                ->title('Tidak Dapat Diselesaikan')
+                                ->body('Purchase Order harus memiliki minimal 1 item sebelum dapat diselesaikan.')
+                                ->danger()
+                                ->send();
+                            return;
+                        }
+
+                        // Hanya ubah status — PurchaseOrder::boot updating()
+                        // akan memanggil updateProductStock() secara otomatis.
                         $record->status = 'completed';
                         $record->save();
+
+                        Notification::make()
+                            ->title('Pembelian Diselesaikan')
+                            ->body('Status berhasil diubah ke Completed. Stok produk telah ditambahkan.')
+                            ->success()
+                            ->send();
                     })
                     ->visible(fn($record) => $record->status === 'pending'),
                 Tables\Actions\DeleteAction::make(),

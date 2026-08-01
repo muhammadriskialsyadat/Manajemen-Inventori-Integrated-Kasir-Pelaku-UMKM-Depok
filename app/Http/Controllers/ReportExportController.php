@@ -101,11 +101,12 @@ class ReportExportController extends Controller
     private function generateReportData($reportType, $startDate, $endDate)
     {
         return match ($reportType) {
-            'stock' => $this->generateStockReport(),
-            'sales' => $this->generateSalesReport($startDate, $endDate),
-            'purchase' => $this->generatePurchaseReport($startDate, $endDate),
+            'stock'          => $this->generateStockReport(),
+            'sales'          => $this->generateSalesReport($startDate, $endDate),
+            'purchase'       => $this->generatePurchaseReport($startDate, $endDate),
             'stock_movement' => $this->generateStockMovementReport($startDate, $endDate),
-            default => null,
+            'tax'            => $this->generateTaxReport($startDate, $endDate),
+            default          => null,
         };
     }
 
@@ -185,13 +186,76 @@ class ReportExportController extends Controller
         ];
     }
 
+    private function generateTaxReport($startDate, $endDate)
+    {
+        $start = Carbon::parse($startDate)->format('Y-m-d');
+        $end   = Carbon::parse($endDate)->format('Y-m-d');
+
+        // PPN Keluaran — dari Penjualan ke Customer
+        $sales = SalesOrder::with('customer')
+            ->whereDate('sale_date', '>=', $start)
+            ->whereDate('sale_date', '<=', $end)
+            ->where('status', 'completed')
+            ->where('tax', '>', 0)
+            ->orderBy('sale_date')
+            ->get()
+            ->map(function ($so) {
+                $afterDiscount = (float) $so->total_amount * (1 - (float) $so->discount / 100);
+                $taxAmount     = $afterDiscount * ((float) $so->tax / 100);
+                return [
+                    'number'      => $so->so_number,
+                    'date'        => $so->sale_date->format('d/m/Y'),
+                    'party'       => $so->customer?->name ?? '-',
+                    'dpp'         => round($afterDiscount, 2),
+                    'tax_rate'    => $so->tax,
+                    'tax_amount'  => round($taxAmount, 2),
+                    'grand_total' => (float) $so->grand_total,
+                ];
+            });
+
+        // PPN Masukan — dari Pembelian ke Supplier
+        $purchases = PurchaseOrder::with('supplier')
+            ->whereDate('purchase_date', '>=', $start)
+            ->whereDate('purchase_date', '<=', $end)
+            ->where('status', 'completed')
+            ->where('tax_percentage', '>', 0)
+            ->orderBy('purchase_date')
+            ->get()
+            ->map(function ($po) {
+                return [
+                    'number'      => $po->po_number,
+                    'date'        => $po->purchase_date->format('d/m/Y'),
+                    'party'       => $po->supplier?->name ?? '-',
+                    'dpp'         => round((float) $po->subtotal - (float) $po->discount_amount, 2),
+                    'tax_rate'    => (float) $po->tax_percentage,
+                    'tax_amount'  => round((float) $po->tax_amount, 2),
+                    'grand_total' => (float) $po->grand_total,
+                ];
+            });
+
+        $totalTaxOut = $sales->sum('tax_amount');
+        $totalTaxIn  = $purchases->sum('tax_amount');
+
+        return [
+            'type'           => 'tax',
+            'sales'          => $sales,
+            'purchases'      => $purchases,
+            'total_tax_out'  => $totalTaxOut,
+            'total_tax_in'   => $totalTaxIn,
+            'tax_difference' => $totalTaxOut - $totalTaxIn,
+            'total_records'  => $sales->count() + $purchases->count(),
+            'period'         => ['start' => $startDate, 'end' => $endDate],
+        ];
+    }
+
     private function getFilename($reportType, $extension)
     {
         $typeNames = [
-            'stock' => 'Laporan_Stok',
-            'sales' => 'Laporan_Penjualan',
-            'purchase' => 'Laporan_Pembelian',
-            'stock_movement' => 'Laporan_Pergerakan_Stok'
+            'stock'          => 'Laporan_Stok',
+            'sales'          => 'Laporan_Penjualan',
+            'purchase'       => 'Laporan_Pembelian',
+            'stock_movement' => 'Laporan_Pergerakan_Stok',
+            'tax'            => 'Laporan_PPN',
         ];
 
         $typeName = $typeNames[$reportType] ?? 'Laporan';
@@ -216,22 +280,30 @@ class ReportExport implements FromCollection, WithHeadings, WithMapping, WithSty
     public function collection()
     {
         return match ($this->reportType) {
-            'stock' => $this->reportData['products'],
-            'sales' => $this->reportData['sales'],
-            'purchase' => $this->reportData['purchases'],
+            'stock'          => $this->reportData['products'],
+            'sales'          => $this->reportData['sales'],
+            'purchase'       => $this->reportData['purchases'],
             'stock_movement' => $this->reportData['movements'],
-            default => collect([]),
+            // Tax: gabung PPN Keluaran + PPN Masukan dalam satu sheet
+            // Beri tag type agar map() bisa bedakan
+            'tax'            => collect(
+                                    collect($this->reportData['sales'])->map(fn($r) => array_merge($r, ['_section' => 'keluaran']))->values()->all()
+                                )->concat(
+                                    collect($this->reportData['purchases'])->map(fn($r) => array_merge($r, ['_section' => 'masukan']))->values()->all()
+                                ),
+            default          => collect([]),
         };
     }
 
     public function headings(): array
     {
         return match ($this->reportType) {
-            'stock' => ['Kode', 'Nama Produk', 'Kategori', 'Stok Saat Ini', 'Stok Minimum', 'Status'],
-            'sales' => ['No. SO', 'Customer', 'Tanggal', 'Subtotal', 'Diskon', 'Diskon (Rp)', 'Pajak', 'Pajak (Rp)', 'Grand Total', 'Status'],
-            'purchase' => ['No. PO', 'Supplier', 'Tanggal', 'Total Amount', 'Status'],
+            'stock'          => ['Kode', 'Nama Produk', 'Kategori', 'Stok Saat Ini', 'Stok Minimum', 'Status'],
+            'sales'          => ['No. SO', 'Customer', 'Tanggal', 'Subtotal', 'Diskon', 'Diskon (Rp)', 'Pajak', 'Pajak (Rp)', 'Grand Total', 'Status'],
+            'purchase'       => ['No. PO', 'Supplier', 'Tanggal', 'Total Amount', 'Status'],
             'stock_movement' => ['Tanggal', 'Produk', 'Tipe', 'Quantity', 'Stok Sebelum', 'Stok Sesudah', 'Keterangan'],
-            default => [],
+            'tax'            => ['Jenis PPN', 'No. Dokumen', 'Tanggal', 'Pihak', 'DPP (Rp)', 'Tarif PPN (%)', 'Nilai PPN (Rp)', 'Total Tagihan (Rp)'],
+            default          => [],
         };
     }
 
@@ -273,6 +345,17 @@ class ReportExport implements FromCollection, WithHeadings, WithMapping, WithSty
                 $row->previous_stock,
                 $row->current_stock,
                 $row->notes
+            ],
+            // $row adalah array hasil map() dari generateTaxReport()
+            'tax' => [
+                $row['_section'] === 'keluaran' ? 'PPN Keluaran (Penjualan)' : 'PPN Masukan (Pembelian)',
+                $row['number'],
+                $row['date'],
+                $row['party'],
+                $row['dpp'],
+                $row['tax_rate'] . '%',
+                $row['tax_amount'],
+                $row['grand_total'],
             ],
             default => [],
         };
