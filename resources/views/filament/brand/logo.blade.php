@@ -17,7 +17,7 @@
     </div>
 
     <!-- Welcome Message dengan Typography yang Elegant -->
-    <div class="space-y-2">
+    {{-- <div class="space-y-2">
         <div class="text-lg text-gray-700 font-semibold">
             Welcome to <span class="text-blue-600">WAROENG SMART</span>
         </div>
@@ -27,5 +27,5 @@
         <div class="text-xs text-gray-400 font-light">
             "Excellence in Every Drop, Quality in Every Stroke"
         </div>
-    </div>
+    </div> --}}
 </div>

@@ -32,12 +32,12 @@ class AdminPanelProvider extends PanelProvider
             ->colors([
                 'primary' => Color::Blue,
             ])
-            ->brandName('Heaven Spot Indonesia')
+            ->brandName('UMKM Kota Depok')
             ->brandLogo(fn() => new HtmlString('
                 <div style="text-align: center;">
                     <div style="font-size: 1.1rem; font-weight: 900; line-height: 1.2;">
-                        <span style="color: #2563eb;">Heaven Spot</span>
-                        <span style="color: #f97316; margin-left: 4px;">Indonesia</span>
+                        <span style="color: #2563eb;">UMKM</span>
+                        <span style="color: #f97316; margin-left: 4px;">KOTA DEPOK</span>
                     </div>
                 </div>
             '))

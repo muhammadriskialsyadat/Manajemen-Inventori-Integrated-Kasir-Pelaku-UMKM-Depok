@@ -4,7 +4,7 @@
 
 <head>
     <meta charset="utf-8">
-    <title>{{ ucfirst(str_replace('_', ' ', $reportType)) }} - Heaven Spot Indonesia</title>
+    <title>{{ ucfirst(str_replace('_', ' ', $reportType)) }} - UMKM Kota Depok</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -135,10 +135,10 @@
 <body>
     <div class="header">
         <div class="company-name">
-            <span class="brand-blue">Heaven Spot</span>
-            <span class="brand-orange"> &bull; Indonesia</span>
+            <span class="brand-blue">UMKM</span>
+            <span class="brand-orange"> &bull; Kota Depok</span>
         </div>
-        <div>Sistem Inventori Heaven Spot Indonesia</div>
+        <div>Sistem Inventori UMKM Kota Depok</div>
         <div class="report-title">
             @if($reportType === 'stock')
             LAPORAN STOK PRODUK
@@ -515,8 +515,8 @@
             <strong>Tanggal:</strong> {{ now()->format('d/m/Y H:i') }}
         </div>
         <div class="footer-right">
-            <strong>Heaven Spot Indonesia</strong><br>
-            Sistem Inventori Heaven Spot Indonesia
+            <strong>UMKM Kota Depok</strong><br>
+            Sistem Inventori UMKM Kota Depok
         </div>
         <div style="clear: both;"></div>
     </div>
